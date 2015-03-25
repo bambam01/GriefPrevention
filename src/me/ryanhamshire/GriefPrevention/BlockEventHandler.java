@@ -29,7 +29,10 @@ import org.bukkit.World.Environment;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
+import org.bukkit.block.Hopper;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.minecart.HopperMinecart;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -39,14 +42,18 @@ import org.bukkit.event.block.BlockDispenseEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockIgniteEvent.IgniteCause;
+import org.bukkit.event.block.BlockMultiPlaceEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockSpreadEvent;
 import org.bukkit.event.block.SignChangeEvent;
+import org.bukkit.event.inventory.InventoryPickupItemEvent;
 import org.bukkit.event.world.StructureGrowEvent;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.Dispenser;
+import org.bukkit.metadata.MetadataValue;
 
 //event handlers related to blocks
 public class BlockEventHandler implements Listener 
@@ -104,17 +111,28 @@ public class BlockEventHandler implements Listener
 		boolean notEmpty = false;
 		for(int i = 0; i < event.getLines().length; i++)
 		{
-			if(event.getLine(i).length() != 0) notEmpty = true;
-			lines.append("\n" + event.getLine(i));
+			String withoutSpaces = event.getLine(i).replace(" ", ""); 
+		    if(!withoutSpaces.isEmpty())
+	        {
+		        notEmpty = true;
+		        lines.append("\n  " + event.getLine(i));
+	        }
 		}
 		
 		String signMessage = lines.toString();
+		
+		//prevent signs with blocked IP addresses 
+		if(!player.hasPermission("griefprevention.spam") && GriefPrevention.instance.containsBlockedIP(signMessage))
+        {
+            event.setCancelled(true);
+            return;
+        }
 		
 		//if not empty and wasn't the same as the last sign, log it and remember it for later
 		PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 		if(notEmpty && playerData.lastMessage != null && !playerData.lastMessage.equals(signMessage))
 		{		
-			GriefPrevention.AddLogEntry("[Sign Placement] <" + player.getName() + "> " + " @ " + GriefPrevention.getfriendlyLocationString(event.getBlock().getLocation()) + lines.toString());
+			GriefPrevention.AddLogEntry("[Sign Placement] <" + player.getName() + "> " + " @ " + GriefPrevention.getfriendlyLocationString(event.getBlock().getLocation()) + ": " + lines.toString().replace("\n  ", ";"));
 			playerData.lastMessage = signMessage;
 			
 			if(!player.hasPermission("griefprevention.eavesdrop"))
@@ -129,6 +147,28 @@ public class BlockEventHandler implements Listener
 				}
 			}
 		}
+	}
+	
+	//when a player places multiple blocks...
+	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+	public void onBlocksPlace(BlockMultiPlaceEvent placeEvent)
+	{
+	    Player player = placeEvent.getPlayer();
+	    
+	    //don't track in worlds where claims are not enabled
+        if(!GriefPrevention.instance.claimsEnabledForWorld(placeEvent.getBlock().getWorld())) return;
+        
+        //make sure the player is allowed to build at the location
+        for(BlockState block : placeEvent.getReplacedBlockStates())
+        {
+            String noBuildReason = GriefPrevention.instance.allowBuild(player, block.getLocation(), block.getType());
+            if(noBuildReason != null)
+            {
+                GriefPrevention.sendMessage(player, TextMode.Err, noBuildReason);
+                placeEvent.setCancelled(true);
+                return;
+            }
+        }
 	}
 	
 	//when a player places a block...
@@ -187,7 +227,7 @@ public class BlockEventHandler implements Listener
 			if(block.getY() <= claim.lesserBoundaryCorner.getBlockY() && claim.allowBuild(player, block.getType()) == null)
 			{
 				//extend the claim downward
-				this.dataStore.extendClaim(claim, claim.getLesserBoundaryCorner().getBlockY() - GriefPrevention.instance.config_claims_claimsExtendIntoGroundDistance);
+				this.dataStore.extendClaim(claim, block.getY() - GriefPrevention.instance.config_claims_claimsExtendIntoGroundDistance);
 			}
 			
 			//allow for a build warning in the future 
@@ -214,7 +254,7 @@ public class BlockEventHandler implements Listener
 				//radius == 0 means protect ONLY the chest
 				if(GriefPrevention.instance.config_claims_automaticClaimsForNewPlayersRadius == 0)
 				{					
-					this.dataStore.createClaim(block.getWorld(), block.getX(), block.getX(), block.getY(), block.getY(), block.getZ(), block.getZ(), player.getUniqueId(), null, null);
+					this.dataStore.createClaim(block.getWorld(), block.getX(), block.getX(), block.getY(), block.getY(), block.getZ(), block.getZ(), player.getUniqueId(), null, null, player);
 					GriefPrevention.sendMessage(player, TextMode.Success, Messages.ChestClaimConfirmation);					
 				}
 				
@@ -228,7 +268,8 @@ public class BlockEventHandler implements Listener
 							block.getY() - GriefPrevention.instance.config_claims_claimsExtendIntoGroundDistance, block.getY(), 
 							block.getZ() - radius, block.getZ() + radius, 
 							player.getUniqueId(), 
-							null, null).succeeded)
+							null, null,
+							player).succeeded)
 					{
 						radius--;
 					}
@@ -242,7 +283,7 @@ public class BlockEventHandler implements Listener
 					Visualization.Apply(player, visualization);
 				}
 				
-				GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo, DataStore.SURVIVAL_VIDEO_URL);
+				GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
 			}
 			
 			//check to see if this chest is in a claim, and warn when it isn't
@@ -269,23 +310,30 @@ public class BlockEventHandler implements Listener
 		//FEATURE: warn players when they're placing non-trash blocks outside of their claimed areas
 		else if(!this.trashBlocks.contains(block.getType()) && GriefPrevention.instance.claimsEnabledForWorld(block.getWorld()))
 		{
-			if(!playerData.warnedAboutBuildingOutsideClaims
+			if(!playerData.warnedAboutBuildingOutsideClaims && !player.hasPermission("griefprevention.adminclaims")
 			   && ((playerData.lastClaim == null && playerData.getClaims().size() == 0)
 			   || (playerData.lastClaim != null && playerData.lastClaim.isNear(player.getLocation(), 15))))
 			{
-				GriefPrevention.sendMessage(player, TextMode.Warn, Messages.BuildingOutsideClaims);
-				playerData.warnedAboutBuildingOutsideClaims = true;
-				
-				if(playerData.getClaims().size() < 2)
-				{
-				    GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo, DataStore.SURVIVAL_VIDEO_URL);
-				}
-				
-				if(playerData.lastClaim != null)
-				{
-				    Visualization visualization = Visualization.FromClaim(playerData.lastClaim, block.getY(), VisualizationType.Claim, player.getLocation());
-				    Visualization.Apply(player, visualization);
-				}
+				Long now = null;
+			    if(playerData.buildWarningTimestamp == null || (now = System.currentTimeMillis()) - playerData.buildWarningTimestamp > 600000)  //10 minute cooldown
+			    {
+    			    GriefPrevention.sendMessage(player, TextMode.Warn, Messages.BuildingOutsideClaims);
+    				playerData.warnedAboutBuildingOutsideClaims = true;
+    				
+    				if(now == null) now = System.currentTimeMillis();
+    				playerData.buildWarningTimestamp = now;
+    				
+    				if(playerData.getClaims().size() < 2)
+    				{
+    				    GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SurvivalBasicsVideo2, DataStore.SURVIVAL_VIDEO_URL);
+    				}
+    				
+    				if(playerData.lastClaim != null)
+    				{
+    				    Visualization visualization = Visualization.FromClaim(playerData.lastClaim, block.getY(), VisualizationType.Claim, player.getLocation());
+    				    Visualization.Apply(player, visualization);
+    				}
+			    }
 			}
 		}
 		
@@ -433,57 +481,64 @@ public class BlockEventHandler implements Listener
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
 	public void onBlockPistonRetract (BlockPistonRetractEvent event)
 	{
-	    //we only care about sticky pistons retracting
-		if(!event.isSticky()) return;
-		
 		//pulling up is always safe
 		if(event.getDirection() == BlockFace.UP) return;
 		
-		//if pulling "air", always safe
-		if(event.getRetractLocation().getBlock().getType() == Material.AIR) return;
-		
-		//don't track in worlds where claims are not enabled
-        if(!GriefPrevention.instance.claimsEnabledForWorld(event.getBlock().getWorld())) return;
-		
-		//if pistons limited to only pulling blocks which are in the same claim the piston is in
-		if(GriefPrevention.instance.config_pistonsInClaimsOnly)
+		try
 		{
-		    //if piston not in a land claim, cancel event
-		    Claim pistonClaim = this.dataStore.getClaimAt(event.getBlock().getLocation(), false, null);
-		    if(pistonClaim == null)
-		    {
-		        event.setCancelled(true);
-		        return;
-		    }
-		    
-		    //if pulled block isn't in the same land claim, cancel the event
-		    if(!pistonClaim.contains(event.getRetractLocation(), false, false))
-		    {
-		        event.setCancelled(true);
-		        return;
-		    }
-		}
-		
-		//otherwise, consider ownership of both piston and block
-		else
-		{
-    		//who owns the moving block, if anyone?
-    		String movingBlockOwnerName = "_";
-    		Claim movingBlockClaim = this.dataStore.getClaimAt(event.getRetractLocation(), false, null);
-    		if(movingBlockClaim != null) movingBlockOwnerName = movingBlockClaim.getOwnerName();
+    		//don't track in worlds where claims are not enabled
+            if(!GriefPrevention.instance.claimsEnabledForWorld(event.getBlock().getWorld())) return;
     		
-    		//who owns the piston, if anyone?
-    		String pistonOwnerName = "_";
-    		Location pistonLocation = event.getBlock().getLocation();		
-    		Claim pistonClaim = this.dataStore.getClaimAt(pistonLocation, false, movingBlockClaim);
-    		if(pistonClaim != null) pistonOwnerName = pistonClaim.getOwnerName();
-    		
-    		//if there are owners for the blocks, they must be the same player
-    		//otherwise cancel the event
-    		if(!pistonOwnerName.equals(movingBlockOwnerName))
+    		//if pistons limited to only pulling blocks which are in the same claim the piston is in
+    		if(GriefPrevention.instance.config_pistonsInClaimsOnly)
     		{
-    			event.setCancelled(true);
+    		    //if piston not in a land claim, cancel event
+    		    Claim pistonClaim = this.dataStore.getClaimAt(event.getBlock().getLocation(), false, null);
+    		    if(pistonClaim == null)
+    		    {
+    		        event.setCancelled(true);
+    		        return;
+    		    }
+    		    
+    		    for(Block movedBlock : event.getBlocks())
+    		    {
+    		        //if pulled block isn't in the same land claim, cancel the event
+        		    if(!pistonClaim.contains(movedBlock.getLocation(), false, false))
+        		    {
+        		        event.setCancelled(true);
+        		        return;
+        		    }
+    		    }
     		}
+    		
+    		//otherwise, consider ownership of both piston and block
+    		else
+    		{
+    		    //who owns the piston, if anyone?
+                String pistonOwnerName = "_";
+                Location pistonLocation = event.getBlock().getLocation();       
+                Claim pistonClaim = this.dataStore.getClaimAt(pistonLocation, false, null);
+                if(pistonClaim != null) pistonOwnerName = pistonClaim.getOwnerName();
+    		    
+    		    String movingBlockOwnerName = "_";
+        		for(Block movedBlock : event.getBlocks())
+        		{
+        		    //who owns the moving block, if anyone?
+                    Claim movingBlockClaim = this.dataStore.getClaimAt(movedBlock.getLocation(), false, pistonClaim);
+            		if(movingBlockClaim != null) movingBlockOwnerName = movingBlockClaim.getOwnerName();
+            		
+            		//if there are owners for the blocks, they must be the same player
+            		//otherwise cancel the event
+            		if(!pistonOwnerName.equals(movingBlockOwnerName))
+            		{
+            			event.setCancelled(true);
+            		}
+        		}
+    		}
+		}
+		catch(NoSuchMethodError exception)
+		{
+		    GriefPrevention.AddLogEntry("Your server is running an outdated version of 1.8 which has a griefing vulnerability.  Update your server (reruns buildtools.jar to get an updated server JAR file) to ensure playres can't steal claimed blocks using pistons.");
 		}
 	}
 	
@@ -605,7 +660,11 @@ public class BlockEventHandler implements Listener
             this.lastSpreadClaim = toClaim;
             if(!toClaim.contains(spreadEvent.getBlock().getLocation(), false, true))
             {
-                spreadEvent.setCancelled(true);
+                //exception: from parent into subdivision
+                if(toClaim.parent == null || !toClaim.parent.contains(spreadEvent.getBlock().getLocation(), false, false))
+                {
+                    spreadEvent.setCancelled(true);
+                }
             }
         }
 	}
@@ -687,4 +746,24 @@ public class BlockEventHandler implements Listener
             }
         }
     }
+	
+	@EventHandler(ignoreCancelled = true)
+    public void onInventoryPickupItem (InventoryPickupItemEvent event)
+	{
+	    //prevent hoppers from picking-up items dropped by players on death
+
+	    InventoryHolder holder = event.getInventory().getHolder();
+	    if(holder instanceof HopperMinecart || holder instanceof Hopper)
+	    {
+	        Item item = event.getItem();
+	        List<MetadataValue> data = item.getMetadata("GP_ITEMOWNER");
+	        
+	        //if this is marked as belonging to a player
+	        if(data != null && data.size() > 0)
+	        {
+	            //don't allow the pickup
+	            event.setCancelled(true);
+	        }
+	    }
+	}
 }

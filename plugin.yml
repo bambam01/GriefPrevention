@@ -1,13 +1,14 @@
 name: GriefPrevention
 main: me.ryanhamshire.GriefPrevention.GriefPrevention
-softdepend: [Vault, Multiverse-Core, My Worlds, MystCraft, Transporter, TheUnderground]
+softdepend: [Vault, Multiverse-Core, My Worlds, MystCraft, Transporter, TheUnderground, WorldGuard, WorldEdit]
 dev-url: http://dev.bukkit.org/server-mods/grief-prevention
 loadbefore: [TheUnderground]
-version: 9.6
+version: 11.1
 commands:
    abandonclaim:
       description: Deletes a claim.
       usage: /AbandonClaim
+      aliases: [unclaim, declaim, removeclaim, disclaim]
       permission: griefprevention.claims
    abandontoplevelclaim:
       description: Deletes a claim and all its subdivisions.
@@ -45,13 +46,18 @@ commands:
    subdivideclaims:
       description: Switches the shovel tool to subdivision mode, used to subdivide your claims.
       usage: /SubdivideClaims
-      aliases: sc
+      aliases: [sc, subdivideclaim]
       permission: griefprevention.claims
    adjustbonusclaimblocks:
       description: Adds or subtracts bonus claim blocks for a player.
       usage: /AdjustBonusClaimBlocks <player> <amount>
       permission: griefprevention.adjustclaimblocks
       aliases: acb
+   setaccruedclaimblocks:
+      description: Updates a player's accrued claim block total.
+      usage: /SetAccruedClaimBlocks <player> <amount>
+      permission: griefprevention.adjustclaimblocks
+      aliases: scb
    deleteclaim:
       description: Deletes the claim you're standing in, even if it's not your claim.
       usage: /DeleteClaim
@@ -118,14 +124,15 @@ commands:
    transferclaim:
       description: Converts an administrative claim to a private claim.
       usage: /TransferClaim <player>
-      permission: griefprevention.adjustclaimblocks
+      aliases: giveclaim
+      permission: griefprevention.transferclaim
    unlockdrops:
       description: Allows other players to pick up the items you dropped when you died.
       usage: /UnlockDrops
    claimslist:
       description: Lists information about a player's claim blocks and claims.
       usage: /ClaimsList or /ClaimsList <player>
-      aliases: claimlist
+      aliases: [claimlist, listclaims]
    claimexplosions:
       description: Toggles whether explosives may be used in a specific land claim.
       usage: /ClaimExplosions
@@ -140,10 +147,15 @@ commands:
    givepet:
       description: Allows a player to give away a pet he or she tamed.
       usage: /GivePet <player>
+      permission: griefprevention.givepet
+   gpblockinfo:
+      description: Allows an administrator to get technical information about blocks in the world and items in hand.
+      usage: /GPBlockInfo
+      permission: griefprevention.gpblockinfo
 permissions:
     griefprevention.createclaims:
         description: Grants permission to create claims.
-        default: op
+        default: true
     griefprevention.admin.*:
         description: Grants all administrative functionality.
         children:
@@ -160,8 +172,24 @@ permissions:
             griefprevention.softmute: true
             griefprevention.reload: true
             griefprevention.visualizenearbyclaims: true
+            griefprevention.overrideclaimcountlimit: true
+            griefprevention.transferclaim: true
+            griefprevention.claimslistother: true
+            griefprevention.siegeimmune: true
+    griefprevention.siegeimmune:
+        description: Makes a player immune to /Siege.
+        default: op
+    griefprevention.givepet:
+        description: Grants permission to use /GivePet.
+        default: true
+    griefprevention.claimslistother:
+        description: Grants permission to use /ClaimsList to get another player's information.
+        default: op
     griefprevention.restorenature:
         description: Grants permission to use /RestoreNature.
+        default: op
+    griefprevention.transferclaim:
+        description: Grants permission to use /TransferClaim.
         default: op
     griefprevention.ignoreclaims:
         description: Grants permission to use /IgnoreClaims.
@@ -204,4 +232,10 @@ permissions:
         default: true
     griefprevention.visualizenearbyclaims:
         description: Allows a player to see all nearby claims at once.
+        default: op
+    griefprevention.gpblockinfo:
+        description: Grants access to /GPBlockInfo.
+        default: op
+    griefprevention.overrideclaimcountlimit:
+        description: Allows players to create more claims than the limit specified by the config.
         default: op

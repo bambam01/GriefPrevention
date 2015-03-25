@@ -193,10 +193,21 @@ public class DatabaseDataStore extends DataStore
                     catch(Exception ex){ }
                 }
                 
+                //refresh data connection in case data migration took a long time
+                this.refreshDataConnection();
+                
                 for(String name : changes.keySet())
                 {
-                    statement = this.databaseConnection.createStatement();
-                    statement.execute("UPDATE griefprevention_playerdata SET name = '" + changes.get(name).toString() + "' WHERE name = '" + name + "';");
+                    try
+                    {
+                        statement = this.databaseConnection.createStatement();
+                        statement.execute("UPDATE griefprevention_playerdata SET name = '" + changes.get(name).toString() + "' WHERE name = '" + name + "';");
+                    }
+                    catch(SQLException e)
+                    {
+                        GriefPrevention.AddLogEntry("Unable to convert player data for " + name + ".  Skipping.");
+                        GriefPrevention.AddLogEntry(e.getMessage());
+                    }
                 }
             }
             catch(SQLException e)
@@ -240,6 +251,7 @@ public class DatabaseDataStore extends DataStore
 				    {
 				        removeClaim = true;
 				        GriefPrevention.AddLogEntry("Removing a claim in a world which does not exist: " + lesserCornerString);
+				        continue;
 				    }
 				    else
 				    {
@@ -249,7 +261,7 @@ public class DatabaseDataStore extends DataStore
 				
 				String ownerName = results.getString("owner");
 				UUID ownerID = null;
-                if(ownerName.isEmpty())
+                if(ownerName.isEmpty() || ownerName.startsWith("--"))
                 {
                     ownerID = null;  //administrative land claim or subdivision
                 }
@@ -261,7 +273,7 @@ public class DatabaseDataStore extends DataStore
                     }
                     catch(Exception ex)
                     {
-                        GriefPrevention.AddLogEntry("This owner name did not convert to aUUID: " + ownerName + ".");
+                        GriefPrevention.AddLogEntry("This owner name did not convert to a UUID: " + ownerName + ".");
                         GriefPrevention.AddLogEntry("  Converted land claim to administrative @ " + lesserBoundaryCorner.toString());
                     }
                 }
@@ -504,6 +516,7 @@ public class DatabaseDataStore extends DataStore
 		{
 			GriefPrevention.AddLogEntry("Unable to retrieve data for player " + playerID.toString() + ".  Details:");
 			GriefPrevention.AddLogEntry(e.getMessage());
+			e.printStackTrace();
 		}
 			
 		return playerData;
@@ -571,11 +584,23 @@ public class DatabaseDataStore extends DataStore
 	synchronized void saveGroupBonusBlocks(String groupName, int currentValue)
 	{
 		//group bonus blocks are stored in the player data table, with player name = $groupName
-		String playerName = "$" + groupName;
-		PlayerData playerData = new PlayerData();
-		playerData.setBonusClaimBlocks(currentValue);
-		
-		this.savePlayerData(playerName, playerData);
+	    try
+        {
+            this.refreshDataConnection();
+            
+            SimpleDateFormat sqlFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            String dateString = sqlFormat.format(new Date());
+            
+            Statement statement = databaseConnection.createStatement();
+            statement.execute("DELETE FROM griefprevention_playerdata WHERE name='$" + groupName + "';");
+            statement = databaseConnection.createStatement();
+            statement.execute("INSERT INTO griefprevention_playerdata (name, lastlogin, accruedblocks, bonusblocks) VALUES ('$" + groupName + "', '" + dateString + "', " + "0" + ", " + String.valueOf(currentValue) + ");");
+        }
+        catch(SQLException e)
+        {
+            GriefPrevention.AddLogEntry("Unable to save data for group " + groupName + ".  Details:");
+            GriefPrevention.AddLogEntry(e.getMessage());
+        }
 	}
 	
 	@Override
@@ -604,6 +629,8 @@ public class DatabaseDataStore extends DataStore
 			Properties connectionProps = new Properties();
 			connectionProps.put("user", this.userName);
 			connectionProps.put("password", this.password);
+			connectionProps.put("autoReconnect", "true");
+			connectionProps.put("maxReconnects", "4");
 			
 			//establish connection
 			this.databaseConnection = DriverManager.getConnection(this.databaseUrl, connectionProps); 
