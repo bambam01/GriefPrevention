@@ -44,6 +44,9 @@ public class PlayerData
 	//how many claim blocks the player has earned via play time
 	private Integer accruedClaimBlocks = null;
 	
+	//temporary holding area to avoid opening data files too early
+	private int newlyAccruedClaimBlocks = 0;
+	
 	//where this player was the last time we checked on him for earning claim blocks
 	public Location lastAfkCheckLocation = null;
 	
@@ -122,6 +125,13 @@ public class PlayerData
     //player which a pet will be given to when it's right-clicked
 	OfflinePlayer petGiveawayRecipient = null;
 	
+	//timestamp for last "you're building outside your land claims" message
+	Long buildWarningTimestamp = null;
+	
+	//spot where a player can't talk, used to mute new players until they've moved a little
+	//this is an anti-bot strategy.
+	Location noChatLocation = null;
+	
 	//whether or not this player is "in" pvp combat
 	public boolean inPvpCombat()
 	{
@@ -160,12 +170,22 @@ public class PlayerData
 	public int getAccruedClaimBlocks()
 	{
 	    if(this.accruedClaimBlocks == null) this.loadDataFromSecondaryStorage();
-        return accruedClaimBlocks;
+        
+	    //move any in the holding area
+	    int newTotal = this.accruedClaimBlocks + this.newlyAccruedClaimBlocks;
+	    this.newlyAccruedClaimBlocks = 0;
+        
+        //respect limits
+        if(newTotal > GriefPrevention.instance.config_claims_maxAccruedBlocks) newTotal = GriefPrevention.instance.config_claims_maxAccruedBlocks;
+	    this.accruedClaimBlocks = newTotal;
+        
+	    return accruedClaimBlocks;
     }
 
     public void setAccruedClaimBlocks(Integer accruedClaimBlocks)
     {
         this.accruedClaimBlocks = accruedClaimBlocks;
+        this.newlyAccruedClaimBlocks = 0;
     }
 
     public int getBonusClaimBlocks()
@@ -218,6 +238,13 @@ public class PlayerData
             if(storageData.accruedClaimBlocks != null)
             {
                 this.accruedClaimBlocks = storageData.accruedClaimBlocks;
+
+                //ensure at least minimum accrued are accrued (in case of settings changes to increase initial amount)
+                if(this.accruedClaimBlocks < GriefPrevention.instance.config_claims_initialBlocks)
+                {
+                    this.accruedClaimBlocks = GriefPrevention.instance.config_claims_initialBlocks;
+                }
+                
             }
             else
             {
@@ -246,18 +273,46 @@ public class PlayerData
             
             //find all the claims belonging to this player and note them for future reference
             DataStore dataStore = GriefPrevention.instance.dataStore;
+            int totalClaimsArea = 0;
             for(int i = 0; i < dataStore.claims.size(); i++)
             {
                 Claim claim = dataStore.claims.get(i);
                 if(playerID.equals(claim.ownerID))
                 {
                     this.claims.add(claim);
+                    totalClaimsArea += claim.getArea();
+                }
+            }
+            
+            //ensure player has claim blocks for his claims, and at least the minimum accrued
+            this.loadDataFromSecondaryStorage();
+            
+            //if total claimed area is more than total blocks available
+            int totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + GriefPrevention.instance.dataStore.getGroupBonusBlocks(this.playerID);
+            if(totalBlocks < totalClaimsArea)
+            {
+                //try to fix it by adding to accrued blocks
+                this.accruedClaimBlocks = totalClaimsArea;
+                if(this.accruedClaimBlocks > GriefPrevention.instance.config_claims_maxAccruedBlocks)
+                {
+                    //remember to respect the maximum on accrued blocks
+                    this.accruedClaimBlocks = GriefPrevention.instance.config_claims_maxAccruedBlocks;
+                }
+                
+                //if that didn't fix it, then make up the difference with bonus blocks
+                totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + GriefPrevention.instance.dataStore.getGroupBonusBlocks(this.playerID);
+                if(totalBlocks < totalClaimsArea)
+                {
+                    this.bonusClaimBlocks += totalClaimsArea - totalBlocks;
                 }
             }
         }
         
         return claims;
     }
-
-
+    
+    public void accrueBlocks(int howMany)
+    {
+        this.newlyAccruedClaimBlocks += howMany;
+    }
 }

@@ -23,11 +23,20 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
+import me.ryanhamshire.GriefPrevention.events.ClaimDeletedEvent;
+
 import org.bukkit.*;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+
+import com.sk89q.worldedit.BlockVector;
+import com.sk89q.worldguard.LocalPlayer;
+import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
+import com.sk89q.worldguard.protection.ApplicableRegionSet;
+import com.sk89q.worldguard.protection.managers.RegionManager;
+import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 
 //singleton class which manages all GriefPrevention data (except for config options)
 public abstract class DataStore 
@@ -68,12 +77,15 @@ public abstract class DataStore
     private int currentSchemaVersion = -1;  //-1 means not determined yet
     
     //video links
-    static final String SURVIVAL_VIDEO_URL = "http://bit.ly/mcgpuser";
-    static final String CREATIVE_VIDEO_URL = "http://bit.ly/mcgpcrea";
-    static final String SUBDIVISION_VIDEO_URL = "http://bit.ly/mcgpsub";
+    static final String SURVIVAL_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpuser";
+    static final String CREATIVE_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpcrea";
+    static final String SUBDIVISION_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpsub";
     
     //list of UUIDs which are soft-muted
-    ConcurrentHashMap<UUID, Boolean> softMuteMap = new ConcurrentHashMap<UUID, Boolean>(); 
+    ConcurrentHashMap<UUID, Boolean> softMuteMap = new ConcurrentHashMap<UUID, Boolean>();
+    
+    //world guard reference, if available
+    private WorldGuardWrapper worldGuard = null;
     
     protected int getSchemaVersion()
     {
@@ -117,6 +129,7 @@ public abstract class DataStore
             if(UUIDFetcher.lookupCache != null)
             {
                 UUIDFetcher.lookupCache.clear();
+                UUIDFetcher.correctedNames.clear();
             }
             
             GriefPrevention.AddLogEntry("Update finished.");
@@ -127,6 +140,16 @@ public abstract class DataStore
         
         //make a note of the data store schema version
 		this.setSchemaVersion(latestSchemaVersion);
+		
+		//try to hook into world guard
+		try
+		{
+		    this.worldGuard = new WorldGuardWrapper();
+		    GriefPrevention.AddLogEntry("Successfully hooked into WorldGuard.");
+		}
+		//if failed, world guard compat features will just be disabled.
+		catch(ClassNotFoundException exception){ }
+		catch(NoClassDefFoundError exception){ }
 	}
 	
 	private void loadSoftMutes()
@@ -301,7 +324,12 @@ public abstract class DataStore
 		}
 		
 		//determine new owner
-		PlayerData newOwnerData = this.getPlayerData(newOwnerID);
+		PlayerData newOwnerData = null;
+		
+		if(newOwnerID != null)
+	    {
+		    newOwnerData = this.getPlayerData(newOwnerID);
+	    }
 		
 		//transfer
 		claim.ownerID = newOwnerID;
@@ -311,13 +339,12 @@ public abstract class DataStore
 		if(ownerData != null)
 		{
 			ownerData.getClaims().remove(claim);
-			ownerData.setBonusClaimBlocks(ownerData.getBonusClaimBlocks() - claim.getArea());
-			this.savePlayerData(claim.ownerID, ownerData);
 		}
 		
-		newOwnerData.getClaims().add(claim);
-		newOwnerData.setBonusClaimBlocks(newOwnerData.getBonusClaimBlocks() + claim.getArea());
-		this.savePlayerData(newOwnerID, newOwnerData);
+		if(newOwnerData != null)
+		{
+		    newOwnerData.getClaims().add(claim);
+		}
 	}
 
 	//adds a claim to the datastore, making it an effective claim
@@ -463,7 +490,12 @@ public abstract class DataStore
 	abstract PlayerData getPlayerDataFromStorage(UUID playerID);
 	
 	//deletes a claim or subdivision
-	synchronized public void deleteClaim(Claim claim)
+    synchronized public void deleteClaim(Claim claim)
+    {
+        this.deleteClaim(claim, true);
+    }
+	
+	synchronized void deleteClaim(Claim claim, boolean fireEvent)
 	{
 	    //subdivisions are simple - just remove them from their parent claim and save that claim
 		if(claim.parent != null)
@@ -472,13 +504,13 @@ public abstract class DataStore
 			parentClaim.children.remove(claim);
 			claim.inDataStore = false;
 	        this.saveClaim(parentClaim);
-			return;
+	        return;
 		}
 		
 		//delete any children
         for(int j = 0; j < claim.children.size(); j++)
         {
-            this.deleteClaim(claim.children.get(j));
+            this.deleteClaim(claim.children.get(j), false);
         }
         
         //mark as deleted so any references elsewhere can be ignored
@@ -525,6 +557,12 @@ public abstract class DataStore
 			}
 			this.savePlayerData(claim.ownerID, ownerData);
 		}
+		
+		if(fireEvent)
+		{
+		    ClaimDeletedEvent ev = new ClaimDeletedEvent(claim);
+            Bukkit.getPluginManager().callEvent(ev);
+		}
 	}
 	
 	abstract void deleteClaimFromSecondaryStorage(Claim claim);
@@ -562,6 +600,25 @@ public abstract class DataStore
 		return null;
 	}
 	
+	//finds a claim by ID
+	public synchronized Claim getClaim(long id)
+	{
+	    for(Claim claim : this.claims)
+	    {
+	        if(claim.getID() == id) return claim;
+	    }
+	    
+	    return null;
+	}
+	
+	//returns a read-only access point for the list of all land claims
+	//if you need to make changes, use provided methods like .deleteClaim() and .createClaim().
+	//this will ensure primary memory (RAM) and secondary memory (disk, database) stay in sync
+	public Collection<Claim> getClaims()
+	{
+	    return Collections.unmodifiableCollection(this.claims);
+	}
+	
 	//gets a unique, persistent identifier string for a chunk
 	private String getChunkString(Location location)
 	{
@@ -570,14 +627,16 @@ public abstract class DataStore
 	
     //creates a claim.
 	//if the new claim would overlap an existing claim, returns a failure along with a reference to the existing claim
+	//if the new claim would overlap a WorldGuard region where the player doesn't have permission to build, returns a failure with NULL for claim
 	//otherwise, returns a success along with a reference to the new claim
 	//use ownerName == "" for administrative claims
 	//for top level claims, pass parent == NULL
 	//DOES adjust claim blocks available on success (players can go into negative quantity available)
+	//DOES check for world guard regions where the player doesn't have permission
 	//does NOT check a player has permission to create a claim, or enough claim blocks.
 	//does NOT check minimum claim size constraints
 	//does NOT visualize the new claim for any players	
-	synchronized public CreateClaimResult createClaim(World world, int x1, int x2, int y1, int y2, int z1, int z2, UUID ownerID, Claim parent, Long id)
+	synchronized public CreateClaimResult createClaim(World world, int x1, int x2, int y1, int y2, int z1, int z2, UUID ownerID, Claim parent, Long id, Player creatingPlayer)
 	{
 		CreateClaimResult result = new CreateClaimResult();
 		
@@ -661,6 +720,17 @@ public abstract class DataStore
 			}
 		}
 		
+		//if worldguard is installed, also prevent claims from overlapping any worldguard regions
+		if(GriefPrevention.instance.config_claims_respectWorldGuard && this.worldGuard != null && creatingPlayer != null)
+		{
+		    if(!this.worldGuard.canBuild(newClaim.lesserBoundaryCorner, newClaim.greaterBoundaryCorner, creatingPlayer))
+		    {
+                result.succeeded = false;
+                result.claim = null;
+                return result;
+            }
+		}
+
 		//otherwise add this new claim to the data store to make it effective
 		this.addClaim(newClaim, true);
 		
@@ -700,20 +770,19 @@ public abstract class DataStore
 		ArrayList<Claim> subdivisions = new ArrayList<Claim>(claim.children);
 		
 		//delete the claim
-		this.deleteClaim(claim);
+		this.deleteClaim(claim, false);
 		
 		//re-create it at the new depth
 		claim.lesserBoundaryCorner.setY(newDepth);
 		claim.greaterBoundaryCorner.setY(newDepth);
 		
-		//re-add the subdivisions (deleteClaim() removed them)
-		claim.children.addAll(subdivisions);
-		
-		//make all subdivisions reach to the same depth
-		for(int i = 0; i < claim.children.size(); i++)
+		//re-add the subdivisions (deleteClaim() removed them) with the new depth
+		for(Claim subdivision : subdivisions)
 		{
-			claim.children.get(i).lesserBoundaryCorner.setY(newDepth);
-			claim.children.get(i).greaterBoundaryCorner.setY(newDepth);
+		    subdivision.lesserBoundaryCorner.setY(newDepth);
+            subdivision.greaterBoundaryCorner.setY(newDepth);
+		    subdivision.parent = claim;
+		    this.addClaim(subdivision, false);
 		}
 		
 		//save changes
@@ -934,7 +1003,7 @@ public abstract class DataStore
 			Claim claim = claimsToDelete.get(i); 
 			claim.removeSurfaceFluids(null);
 			
-			this.deleteClaim(claim);
+			this.deleteClaim(claim, true);
 			
 			//if in a creative mode world, delete the claim
 			if(GriefPrevention.instance.creativeRulesApply(claim.getLesserBoundaryCorner()))
@@ -946,16 +1015,16 @@ public abstract class DataStore
 
 	//tries to resize a claim
 	//see CreateClaim() for details on return value
-	synchronized public CreateClaimResult resizeClaim(Claim claim, int newx1, int newx2, int newy1, int newy2, int newz1, int newz2)
+	synchronized public CreateClaimResult resizeClaim(Claim claim, int newx1, int newx2, int newy1, int newy2, int newz1, int newz2, Player resizingPlayer)
 	{
 		//note any subdivisions before deleting the claim
 	    ArrayList<Claim> subdivisions = new ArrayList<Claim>(claim.children);
 	    
 	    //remove old claim
-		this.deleteClaim(claim);					
+		this.deleteClaim(claim, false);					
 		
 		//try to create this new claim, ignoring the original when checking for overlap
-		CreateClaimResult result = this.createClaim(claim.getLesserBoundaryCorner().getWorld(), newx1, newx2, newy1, newy2, newz1, newz2, claim.ownerID, claim.parent, claim.id);
+		CreateClaimResult result = this.createClaim(claim.getLesserBoundaryCorner().getWorld(), newx1, newx2, newy1, newy2, newz1, newz2, claim.ownerID, claim.parent, claim.id, resizingPlayer);
 		
 		//if succeeded
 		if(result.succeeded)
@@ -982,7 +1051,11 @@ public abstract class DataStore
 			}
 			
 			//restore subdivisions
-			result.claim.children.addAll(subdivisions);
+			for(Claim subdivision : subdivisions)
+			{
+			    subdivision.parent = result.claim;
+			    this.addClaim(subdivision, false);
+			}
 			
 			//save those changes
 			this.saveClaim(result.claim);
@@ -1037,7 +1110,7 @@ public abstract class DataStore
 		this.addDefault(defaults, Messages.AdminClaimsMode, "Administrative claims mode active.  Any claims created will be free and editable by other administrators.", null);
 		this.addDefault(defaults, Messages.BasicClaimsMode, "Returned to basic claim creation mode.", null);
 		this.addDefault(defaults, Messages.SubdivisionMode, "Subdivision mode.  Use your shovel to create subdivisions in your existing claims.  Use /basicclaims to exit.", null);
-		this.addDefault(defaults, Messages.SubdivisionVideo, "Subdivision Help: {0}", "0:video URL");
+		this.addDefault(defaults, Messages.SubdivisionVideo2, "Click for Subdivision Help: {0}", "0:video URL");
 		this.addDefault(defaults, Messages.DeleteClaimMissing, "There's no claim here.", null);
 		this.addDefault(defaults, Messages.DeletionSubdivisionWarning, "This claim includes subdivisions.  If you're sure you want to delete it, use /DeleteClaim again.", null);
 		this.addDefault(defaults, Messages.DeleteSuccess, "Claim deleted.", null);
@@ -1090,8 +1163,8 @@ public abstract class DataStore
 		this.addDefault(defaults, Messages.NoDamageClaimedEntity, "That belongs to {0}.", "0: owner name");
 		this.addDefault(defaults, Messages.ShovelBasicClaimMode, "Shovel returned to basic claims mode.", null);
 		this.addDefault(defaults, Messages.RemainingBlocks, "You may claim up to {0} more blocks.", "0: remaining blocks");
-		this.addDefault(defaults, Messages.CreativeBasicsVideo, "Land Claim Help: {0}", "{0}: video URL");
-		this.addDefault(defaults, Messages.SurvivalBasicsVideo, "Land Claim Help: {0}", "{0}: video URL");
+		this.addDefault(defaults, Messages.CreativeBasicsVideo2, "Click for Land Claim Help: {0}", "{0}: video URL");
+		this.addDefault(defaults, Messages.SurvivalBasicsVideo2, "Click for Land Claim Help: {0}", "{0}: video URL");
 		this.addDefault(defaults, Messages.TrappedChatKeyword, "trapped", "When mentioned in chat, players get information about the /trapped command.");
 		this.addDefault(defaults, Messages.TrappedInstructions, "Are you trapped in someone's land claim?  Try the /trapped command.", null);
 		this.addDefault(defaults, Messages.PvPNoDrop, "You can't drop items while in PvP combat.", null);
@@ -1111,7 +1184,7 @@ public abstract class DataStore
 		this.addDefault(defaults, Messages.NoCreateClaimPermission, "You don't have permission to claim land.", null);
 		this.addDefault(defaults, Messages.ResizeClaimTooSmall, "This new size would be too small.  Claims must be at least {0} x {0}.", "0: minimum claim size");
 		this.addDefault(defaults, Messages.ResizeNeedMoreBlocks, "You don't have enough blocks for this size.  You need {0} more.", "0: how many needed");
-		this.addDefault(defaults, Messages.ClaimResizeSuccess, "Claim resized.  You now have {0} available claim blocks.", "0: remaining blocks");
+		this.addDefault(defaults, Messages.ClaimResizeSuccess, "Claim resized.  {0} available claim blocks remaining.", "0: remaining blocks");
 		this.addDefault(defaults, Messages.ResizeFailOverlap, "Can't resize here because it would overlap another nearby claim.", null);
 		this.addDefault(defaults, Messages.ResizeStart, "Resizing claim.  Use your shovel again at the new location for this corner.", null);
 		this.addDefault(defaults, Messages.ResizeFailOverlapSubdivision, "You can't create a subdivision here because it would overlap another subdivision.  Consider /abandonclaim to delete it, or use your shovel at a corner to resize it.", null);
@@ -1180,6 +1253,16 @@ public abstract class DataStore
 		this.addDefault(defaults, Messages.PetGiveawayConfirmation, "Pet transferred.", null);
 		this.addDefault(defaults, Messages.PetTransferCancellation, "Pet giveaway cancelled.", null);
 		this.addDefault(defaults, Messages.ReadyToTransferPet, "Ready to transfer!  Right-click the pet you'd like to give away, or cancel with /GivePet cancel.", null);
+		this.addDefault(defaults, Messages.AvoidGriefClaimLand, "Prevent grief!  If you claim your land, you will be grief-proof.", null);
+		this.addDefault(defaults, Messages.BecomeMayor, "Subdivide your land claim and become a mayor!", null);
+		this.addDefault(defaults, Messages.ClaimCreationFailedOverClaimCountLimit, "You've reached your limit on land claims.  Use /AbandonClaim to remove one before creating another.", null);
+		this.addDefault(defaults, Messages.CreateClaimFailOverlapRegion, "You can't claim all of this because you're not allowed to build here.", null);
+		this.addDefault(defaults, Messages.ResizeFailOverlapRegion, "You don't have permission to build there, so you can't claim that area.", null);
+		this.addDefault(defaults, Messages.NoBuildPortalPermission, "You can't use this portal because you don't have {0}'s permission to build an exit portal in the destination land claim.", "0: Destination land claim owner's name.");
+		this.addDefault(defaults, Messages.ShowNearbyClaims, "Found {0} land claims.", "0: Number of claims found.");
+		this.addDefault(defaults, Messages.NoChatUntilMove, "Sorry, but you have to move a little more before you can chat.  We get lots of spam bots here.  :)", null);
+		this.addDefault(defaults, Messages.SiegeImmune, "That player is immune to /siege.", null);
+		this.addDefault(defaults, Messages.SetClaimBlocksSuccess, "Updated accrued claim blocks.", null);
 		
 		//load the config file
 		FileConfiguration config = YamlConfiguration.loadConfiguration(new File(messagesFilePath));
@@ -1310,9 +1393,9 @@ public abstract class DataStore
 	}
 
     //gets all the claims "near" a location
-	ArrayList<Claim> getNearbyClaims(Location location)
+	Set<Claim> getNearbyClaims(Location location)
     {
-        ArrayList<Claim> claims = new ArrayList<Claim>();
+        Set<Claim> claims = new HashSet<Claim>();
         
         Chunk lesserChunk = location.getWorld().getChunkAt(location.subtract(150, 0, 150));
         Chunk greaterChunk = location.getWorld().getChunkAt(location.add(300, 0, 300));
@@ -1331,6 +1414,6 @@ public abstract class DataStore
             }
         }
         
-        return claims;        
+        return claims;
     }
 }
