@@ -41,7 +41,7 @@ class DeliverClaimBlocksTask implements Runnable
 		{
 	        
 	        long i = 0;
-	        for(Player onlinePlayer : GriefPrevention.server.getOnlinePlayers())
+	        for(Player onlinePlayer : GriefPrevention.instance.getServer().getOnlinePlayers())
 	        {
 	            DeliverClaimBlocksTask newTask = new DeliverClaimBlocksTask(onlinePlayer);
 	            GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, newTask, i++);

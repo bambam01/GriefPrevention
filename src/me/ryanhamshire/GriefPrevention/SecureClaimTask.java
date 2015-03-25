@@ -41,7 +41,7 @@ class SecureClaimTask implements Runnable
 			claim.doorsOpen = false;
 			
 			//eject bad guys
-			for(Player player : GriefPrevention.server.getOnlinePlayers())
+			for(Player player : GriefPrevention.instance.getServer().getOnlinePlayers())
 			{
 				if(claim.contains(player.getLocation(), false, false) && claim.allowAccess(player) != null)
 				{
