@@ -163,21 +163,23 @@ class EntityEventHandler implements Listener
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
 	public void onEntityExplode(EntityExplodeEvent explodeEvent)
 	{		
-		//only applies to claims-enabled worlds
-	    Location location = explodeEvent.getLocation();
-		World world = location.getWorld();
-	    
-		if(!GriefPrevention.instance.claimsEnabledForWorld(world)) return;
-	    
-		//FEATURE: explosions don't destroy blocks when they explode near or above sea level in standard worlds
-		boolean isCreeper = (explodeEvent.getEntity() != null && explodeEvent.getEntity() instanceof Creeper);
-		
-		boolean applySeaLevelRules = world.getEnvironment() == Environment.NORMAL && ((isCreeper && GriefPrevention.instance.config_blockSurfaceCreeperExplosions) || (!isCreeper && GriefPrevention.instance.config_blockSurfaceOtherExplosions));
-		
-		List<Block> blocks = explodeEvent.blockList();
+		this.handleExplosion(explodeEvent.getLocation(), explodeEvent.getEntity(), explodeEvent.blockList());
+	}
+    
+    void handleExplosion(Location location, Entity entity, List<Block> blocks)
+    {
+        //only applies to claims-enabled worlds
+        World world = location.getWorld();
         
-		//special rule for creative worlds: explosions don't destroy anything
-        if(GriefPrevention.instance.creativeRulesApply(explodeEvent.getLocation()))
+        if(!GriefPrevention.instance.claimsEnabledForWorld(world)) return;
+        
+        //FEATURE: explosions don't destroy surface blocks by default
+        boolean isCreeper = (entity != null && entity instanceof Creeper);
+        
+        boolean applySurfaceRules = world.getEnvironment() == Environment.NORMAL && ((isCreeper && GriefPrevention.instance.config_blockSurfaceCreeperExplosions) || (!isCreeper && GriefPrevention.instance.config_blockSurfaceOtherExplosions));
+        
+        //special rule for creative worlds: explosions don't destroy anything
+        if(GriefPrevention.instance.creativeRulesApply(location))
         {
             for(int i = 0; i < blocks.size(); i++)
             {
@@ -189,8 +191,8 @@ class EntityEventHandler implements Listener
             
             return;
         }
-		
-		//make a list of blocks which were allowed to explode
+        
+        //make a list of blocks which were allowed to explode
         List<Block> explodedBlocks = new ArrayList<Block>();
         Claim cachedClaim = null;
         for(int i = 0; i < blocks.size(); i++)
@@ -221,8 +223,8 @@ class EntityEventHandler implements Listener
                 continue;
             }
             
-            //if no, then also consider sea level rules
-            if(applySeaLevelRules)
+            //if no, then also consider surface rules
+            if(applySurfaceRules && claim == null)
             {
                 if(block.getLocation().getBlockY() < GriefPrevention.instance.getSeaLevel(world) - 7)
                 {
@@ -234,7 +236,7 @@ class EntityEventHandler implements Listener
         //clear original damage list and replace with allowed damage list
         blocks.clear();
         blocks.addAll(explodedBlocks);
-	}
+    }
 	
 	//when an item spawns...
 	@EventHandler(priority = EventPriority.LOWEST)
@@ -489,6 +491,9 @@ class EntityEventHandler implements Listener
 	{
 		//monsters are never protected
 		if(event.getEntity() instanceof Monster) return;
+		
+		//horse protections can be disabled
+		if(event.getEntity() instanceof Horse && !GriefPrevention.instance.config_claims_protectHorses) return;
 		
 		//protect pets from environmental damage types which could be easily caused by griefers
         if(event.getEntity() instanceof Tameable && !GriefPrevention.instance.config_pvp_enabledWorlds.contains(event.getEntity().getWorld()))

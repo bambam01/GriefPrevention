@@ -1439,9 +1439,10 @@ class PlayerEventHandler implements Listener
 		        (
 		                clickedBlockType == Material.NOTE_BLOCK || 
 		                clickedBlockType == Material.DIODE_BLOCK_ON || 
-		                clickedBlockType == Material.DIODE_BLOCK_OFF) ||
+		                clickedBlockType == Material.DIODE_BLOCK_OFF ||
+		                clickedBlockType == Material.DRAGON_EGG ||
 		                clickedBlockType == Material.DAYLIGHT_DETECTOR
-		        )
+		        ))
 		{
 		    if(playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
 		    Claim claim = this.dataStore.getClaimAt(clickedBlock.getLocation(), false, playerData.lastClaim);
@@ -1467,8 +1468,8 @@ class PlayerEventHandler implements Listener
 			ItemStack itemInHand = player.getItemInHand();
 			Material materialInHand = itemInHand.getType();		
 			
-			//if it's bonemeal or armor stand, check for build permission (ink sac == bone meal, must be a Bukkit bug?)
-			if(clickedBlock != null && (materialInHand == Material.INK_SACK))
+			//if it's bonemeal or armor stand or spawn egg, check for build permission (ink sac == bone meal, must be a Bukkit bug?)
+			if(clickedBlock != null && (materialInHand == Material.INK_SACK || materialInHand == Material.MONSTER_EGG))
 			{
 				String noBuildReason = GriefPrevention.instance.allowBuild(player, clickedBlock.getLocation(), clickedBlockType);
 				if(noBuildReason != null)
@@ -1498,7 +1499,7 @@ class PlayerEventHandler implements Listener
 			}
 			
 			//if it's a spawn egg, minecart, or boat, and this is a creative world, apply special rules
-			else if(clickedBlock != null && (materialInHand == Material.MONSTER_EGG || materialInHand == Material.MINECART || materialInHand == Material.POWERED_MINECART || materialInHand == Material.STORAGE_MINECART || materialInHand == Material.BOAT) && GriefPrevention.instance.creativeRulesApply(clickedBlock.getLocation()))
+			else if(clickedBlock != null && (materialInHand == Material.MINECART || materialInHand == Material.POWERED_MINECART || materialInHand == Material.STORAGE_MINECART || materialInHand == Material.BOAT) && GriefPrevention.instance.creativeRulesApply(clickedBlock.getLocation()))
 			{
 				//player needs build permission at this location
 				String noBuildReason = GriefPrevention.instance.allowBuild(player, clickedBlock.getLocation(), Material.MINECART);
@@ -2293,6 +2294,7 @@ class PlayerEventHandler implements Listener
             case DIODE_BLOCK_ON:  //redstone repeater
             case DIODE_BLOCK_OFF:
             case CAKE_BLOCK:
+            case DRAGON_EGG:
                 return true;
             default:
                 return false;
