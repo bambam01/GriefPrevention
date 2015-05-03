@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import me.ryanhamshire.GriefPrevention.DataStore.NoTransferException;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.*;
 import org.bukkit.World.Environment;
@@ -56,6 +57,9 @@ public class GriefPrevention extends JavaPlugin
 	
 	//this tracks item stacks expected to drop which will need protection
     ArrayList<PendingItemProtection> pendingItemWatchList = new ArrayList<PendingItemProtection>();
+    
+    //log entry manager for GP's custom log files
+    CustomLogger customLogger;
 	
 	//configuration variables, loaded/saved from a config.yml
 	
@@ -142,6 +146,8 @@ public class GriefPrevention extends JavaPlugin
 	public boolean config_creaturesTrampleCrops;					//whether or not non-player entities may trample crops
 	public boolean config_zombiesBreakDoors;						//whether or not hard-mode zombies may break down wooden doors
 	
+	public int config_ipLimit;                                      //how many players can share an IP address
+	
 	public MaterialCollection config_mods_accessTrustIds;			//list of block IDs which should require /accesstrust for player interaction
 	public MaterialCollection config_mods_containerTrustIds;		//list of block IDs which should require /containertrust for player interaction
 	public List<String> config_mods_ignoreClaimsAccounts;			//list of player names which ALWAYS ignore claims
@@ -151,6 +157,13 @@ public class GriefPrevention extends JavaPlugin
 	
 	public boolean config_limitTreeGrowth;                          //whether trees should be prevented from growing into a claim from outside
 	public boolean config_pistonsInClaimsOnly;                      //whether pistons are limited to only move blocks located within the piston's land claim
+	
+	//custom log settings
+	public int config_logs_daysToKeep;
+    public boolean config_logs_socialEnabled;
+    public boolean config_logs_suspiciousEnabled;
+    public boolean config_logs_adminEnabled;
+    public boolean config_logs_debugEnabled;
 	
 	private String databaseUrl;
 	private String databaseUserName;
@@ -166,20 +179,36 @@ public class GriefPrevention extends JavaPlugin
 	public static final int NOTIFICATION_SECONDS = 20;
 	
 	//adds a server log entry
-	public static synchronized void AddLogEntry(String entry)
+	public static synchronized void AddLogEntry(String entry, CustomLogEntryTypes customLogType, boolean excludeFromServerLogs)
 	{
-		log.info("GriefPrevention: " + entry);
+		if(customLogType != null && GriefPrevention.instance.customLogger != null)
+		{
+		    GriefPrevention.instance.customLogger.AddEntry(entry, customLogType);
+		}
+	    if(!excludeFromServerLogs) log.info("GriefPrevention: " + entry);
 	}
+	
+	public static synchronized void AddLogEntry(String entry, CustomLogEntryTypes customLogType)
+    {
+        AddLogEntry(entry, customLogType, false);
+    }
+	
+	public static synchronized void AddLogEntry(String entry)
+    {
+        AddLogEntry(entry, CustomLogEntryTypes.Debug);
+    }
 	
 	//initializes well...   everything
 	public void onEnable()
 	{ 		
-		AddLogEntry("Grief Prevention boot start.");
-		
-		instance = this;
+	    instance = this;
+        
+        AddLogEntry("Grief Prevention boot start.");
 		
 		this.loadConfig();
 		
+		this.customLogger = new CustomLogger();
+        
 		AddLogEntry("Finished loading configuration.");
 		
 		//when datastore initializes, it loads player and claim data, and posts some stats to the log
@@ -245,7 +274,7 @@ public class GriefPrevention extends JavaPlugin
 		if(this.config_claims_blocksAccruedPerHour > 0)
 		{
 			DeliverClaimBlocksTask task = new DeliverClaimBlocksTask(null);
-			this.getServer().getScheduler().scheduleSyncRepeatingTask(this, task, 20L * 60 * 5, 20L * 60 * 5);
+			this.getServer().getScheduler().scheduleSyncRepeatingTask(this, task, 20L * 60 * 10, 20L * 60 * 10);
 		}
 		
 		//start the recurring cleanup event for entities in creative worlds
@@ -318,7 +347,7 @@ public class GriefPrevention extends JavaPlugin
 	
 	private void loadConfig()
 	{
-	  //load the config if it exists
+	    //load the config if it exists
         FileConfiguration config = YamlConfiguration.loadConfiguration(new File(DataStore.configFilePath));
         FileConfiguration outConfig = new YamlConfiguration();
         
@@ -504,6 +533,7 @@ public class GriefPrevention extends JavaPlugin
         String whisperCommandsToMonitor = config.getString("GriefPrevention.WhisperCommands", "/tell;/pm;/r;/w;/whisper;/t;/msg");
         
         this.config_smartBan = config.getBoolean("GriefPrevention.SmartBan", true);
+        this.config_ipLimit = config.getInt("GriefPrevention.MaxPlayersPerIpAddress", 3); 
         
         this.config_endermenMoveBlocks = config.getBoolean("GriefPrevention.EndermenMoveBlocks", false);
         this.config_silverfishBreakBlocks = config.getBoolean("GriefPrevention.SilverfishBreakBlocks", false);
@@ -646,6 +676,13 @@ public class GriefPrevention extends JavaPlugin
         this.databaseUserName = config.getString("GriefPrevention.Database.UserName", "");
         this.databasePassword = config.getString("GriefPrevention.Database.Password", "");
         
+        //custom logger settings
+        this.config_logs_daysToKeep = config.getInt("GriefPrevention.Abridged Logs.Days To Keep", 7);
+        this.config_logs_socialEnabled = config.getBoolean("GriefPrevention.Abridged Logs.Included Entry Types.Social Activity", true);
+        this.config_logs_suspiciousEnabled = config.getBoolean("GriefPrevention.Abridged Logs.Included Entry Types.Suspicious Activity", true);
+        this.config_logs_adminEnabled = config.getBoolean("GriefPrevention.Abridged Logs.Included Entry Types.Administrative Activity", false);
+        this.config_logs_debugEnabled = config.getBoolean("GriefPrevention.Abridged Logs.Included Entry Types.Debug", false);
+        
         //claims mode by world
         for(World world : this.config_claims_worldModes.keySet())
         {
@@ -725,6 +762,7 @@ public class GriefPrevention extends JavaPlugin
         
         outConfig.set("GriefPrevention.WhisperCommands", whisperCommandsToMonitor);     
         outConfig.set("GriefPrevention.SmartBan", this.config_smartBan);
+        outConfig.set("GriefPrevention.MaxPlayersPerIpAddress", this.config_ipLimit);
         
         outConfig.set("GriefPrevention.Siege.Worlds", siegeEnabledWorldNames);
         outConfig.set("GriefPrevention.Siege.BreakableBlocks", breakableBlocksList);
@@ -745,6 +783,13 @@ public class GriefPrevention extends JavaPlugin
         outConfig.set("GriefPrevention.Mods.BlockIdsRequiringAccessTrust", accessTrustStrings);
         outConfig.set("GriefPrevention.Mods.BlockIdsRequiringContainerTrust", containerTrustStrings);
         outConfig.set("GriefPrevention.Mods.BlockIdsExplodable", explodableStrings);
+        
+        //custom logger settings
+        outConfig.set("GriefPrevention.Abridged Logs.Days To Keep", this.config_logs_daysToKeep);
+        outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Social Activity", this.config_logs_socialEnabled);
+        outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Suspicious Activity", this.config_logs_suspiciousEnabled);
+        outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Administrative Activity", this.config_logs_adminEnabled);
+        outConfig.set("GriefPrevention.Abridged Logs.Included Entry Types.Debug", this.config_logs_debugEnabled);
         
         try
         {
@@ -982,15 +1027,15 @@ public class GriefPrevention extends JavaPlugin
 			{
 				this.dataStore.changeClaimOwner(claim, newOwnerID);
 			}
-			catch(Exception e)
+			catch(NoTransferException e)
 			{
 			    GriefPrevention.sendMessage(player, TextMode.Instr, Messages.TransferTopLevel);
-				return true;
+    			return true;
 			}
 			
 			//confirm
 			GriefPrevention.sendMessage(player, TextMode.Success, Messages.TransferSuccess);
-			GriefPrevention.AddLogEntry(player.getName() + " transferred a claim at " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + " to " + ownerName + ".");
+			GriefPrevention.AddLogEntry(player.getName() + " transferred a claim at " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + " to " + ownerName + ".", CustomLogEntryTypes.AdminActivity);
 			
 			return true;
 		}
@@ -1349,7 +1394,7 @@ public class GriefPrevention extends JavaPlugin
 			
 			//load player data
 			PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
-			int availableBlocks = Math.min(playerData.getBonusClaimBlocks(), playerData.getRemainingClaimBlocks());
+			int availableBlocks = playerData.getRemainingClaimBlocks();
 			
 			//if no amount provided, just tell player value per block sold, and how many he can sell
 			if(args.length != 1)
@@ -1465,7 +1510,7 @@ public class GriefPrevention extends JavaPlugin
 						}
 						
 						GriefPrevention.sendMessage(player, TextMode.Success, Messages.DeleteSuccess);
-						GriefPrevention.AddLogEntry(player.getName() + " deleted " + claim.getOwnerName() + "'s claim at " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()));
+						GriefPrevention.AddLogEntry(player.getName() + " deleted " + claim.getOwnerName() + "'s claim at " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()), CustomLogEntryTypes.AdminActivity);
 						
 						//revert any current visualization
 						Visualization.Revert(player);
@@ -1536,7 +1581,7 @@ public class GriefPrevention extends JavaPlugin
 			GriefPrevention.sendMessage(player, TextMode.Success, Messages.DeleteAllSuccess, otherPlayer.getName());
 			if(player != null)
 			{
-				GriefPrevention.AddLogEntry(player.getName() + " deleted all claims belonging to " + otherPlayer.getName() + ".");
+				GriefPrevention.AddLogEntry(player.getName() + " deleted all claims belonging to " + otherPlayer.getName() + ".", CustomLogEntryTypes.AdminActivity);
 			
 				//revert any current visualization
 				Visualization.Revert(player);
@@ -1587,7 +1632,7 @@ public class GriefPrevention extends JavaPlugin
 			GriefPrevention.sendMessage(player, TextMode.Instr, " " + playerData.getAccruedClaimBlocks() + " blocks from play +" + (playerData.getBonusClaimBlocks() + this.dataStore.getGroupBonusBlocks(otherPlayer.getUniqueId())) + " bonus = " + (playerData.getAccruedClaimBlocks() + playerData.getBonusClaimBlocks() + this.dataStore.getGroupBonusBlocks(otherPlayer.getUniqueId())) + " total.");
 			if(claims.size() > 0)
 			{
-    			GriefPrevention.sendMessage(player, TextMode.Instr, "Your Claims:");
+    			GriefPrevention.sendMessage(player, TextMode.Instr, "Claims:");
     			for(int i = 0; i < playerData.getClaims().size(); i++)
     			{
     				Claim claim = playerData.getClaims().get(i);
@@ -1629,7 +1674,7 @@ public class GriefPrevention extends JavaPlugin
 			GriefPrevention.sendMessage(player, TextMode.Success, Messages.AllAdminDeleted);
 			if(player != null)
 			{
-				GriefPrevention.AddLogEntry(player.getName() + " deleted all administrative claims.");
+				GriefPrevention.AddLogEntry(player.getName() + " deleted all administrative claims.", CustomLogEntryTypes.AdminActivity);
 			
 				//revert any current visualization
 				Visualization.Revert(player);
@@ -1668,12 +1713,23 @@ public class GriefPrevention extends JavaPlugin
 			}
 			
 			//otherwise, find the specified player
-			OfflinePlayer targetPlayer = this.resolvePlayerByName(args[0]);
-			if(targetPlayer == null)
+			OfflinePlayer targetPlayer;
+			try
 			{
-				GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
-				return true;
+			    UUID playerID = UUID.fromString(args[0]);
+			    targetPlayer = this.getServer().getOfflinePlayer(playerID);
+			    
 			}
+			catch(IllegalArgumentException e)
+			{
+    			targetPlayer = this.resolvePlayerByName(args[0]);
+			}
+			
+			if(targetPlayer == null)
+            {
+                GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
+                return true;
+            }
 			
 			//give blocks to player
 			PlayerData playerData = this.dataStore.getPlayerData(targetPlayer.getUniqueId());
@@ -1681,7 +1737,7 @@ public class GriefPrevention extends JavaPlugin
 			this.dataStore.savePlayerData(targetPlayer.getUniqueId(), playerData);
 			
 			GriefPrevention.sendMessage(player, TextMode.Success, Messages.AdjustBlocksSuccess, targetPlayer.getName(), String.valueOf(adjustment), String.valueOf(playerData.getBonusClaimBlocks()));
-			if(player != null) GriefPrevention.AddLogEntry(player.getName() + " adjusted " + targetPlayer.getName() + "'s bonus claim blocks by " + adjustment + ".");
+			if(player != null) GriefPrevention.AddLogEntry(player.getName() + " adjusted " + targetPlayer.getName() + "'s bonus claim blocks by " + adjustment + ".", CustomLogEntryTypes.AdminActivity);
 			
 			return true;			
 		}
@@ -1717,7 +1773,7 @@ public class GriefPrevention extends JavaPlugin
             this.dataStore.savePlayerData(targetPlayer.getUniqueId(), playerData);
             
             GriefPrevention.sendMessage(player, TextMode.Success, Messages.SetClaimBlocksSuccess);
-            if(player != null) GriefPrevention.AddLogEntry(player.getName() + " set " + targetPlayer.getName() + "'s accrued claim blocks to " + newAmount + ".");
+            if(player != null) GriefPrevention.AddLogEntry(player.getName() + " set " + targetPlayer.getName() + "'s accrued claim blocks to " + newAmount + ".", CustomLogEntryTypes.AdminActivity);
             
             return true;
         }
@@ -2231,7 +2287,7 @@ public class GriefPrevention extends JavaPlugin
 	//helper method to resolve a player by name
 	ConcurrentHashMap<String, UUID> playerNameToIDMap = new ConcurrentHashMap<String, UUID>();
 
-	//thread to build the above cache
+    //thread to build the above cache
 	private class CacheOfflinePlayerNamesThread extends Thread
     {
         private OfflinePlayer [] offlinePlayers;
@@ -2355,6 +2411,9 @@ public class GriefPrevention extends JavaPlugin
 		}
 		
 		this.dataStore.close();
+		
+		//dump any remaining unwritten log entries
+		this.customLogger.WriteEntries();
 		
 		AddLogEntry("GriefPrevention disabled.");
 	}

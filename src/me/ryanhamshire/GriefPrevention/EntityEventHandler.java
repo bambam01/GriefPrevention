@@ -59,7 +59,7 @@ class EntityEventHandler implements Listener
 	
 	//don't allow endermen to change blocks
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
-	public void onEntityChangeBLock(EntityChangeBlockEvent event)
+	public void onEntityChangeBlock(EntityChangeBlockEvent event)
 	{
 	    if(!GriefPrevention.instance.config_endermenMoveBlocks && event.getEntityType() == EntityType.ENDERMAN)
 		{
@@ -217,16 +217,16 @@ class EntityEventHandler implements Listener
             }
                     
             //if yes, apply claim exemptions if they should apply
-            if((claim != null && claim.areExplosivesAllowed) || !GriefPrevention.instance.config_blockClaimExplosions)
+            if(claim != null && (claim.areExplosivesAllowed || !GriefPrevention.instance.config_blockClaimExplosions))
             {
                 explodedBlocks.add(block);
                 continue;
             }
             
             //if no, then also consider surface rules
-            if(applySurfaceRules && claim == null)
+            if(claim == null)
             {
-                if(block.getLocation().getBlockY() < GriefPrevention.instance.getSeaLevel(world) - 7)
+                if(!applySurfaceRules || block.getLocation().getBlockY() < GriefPrevention.instance.getSeaLevel(world) - 7)
                 {
                     explodedBlocks.add(block);
                 }
