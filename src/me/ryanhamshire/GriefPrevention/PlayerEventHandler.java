@@ -1434,19 +1434,27 @@ public class PlayerEventHandler implements Listener
 	    //not interested in left-click-on-air actions
 	    Action action = event.getAction();
 	    if(action == Action.LEFT_CLICK_AIR) return;
-	    if(action == Action.PHYSICAL) return;
-	    
-	    Player player = event.getPlayer();
+
+		Player player = event.getPlayer();
 		Block clickedBlock = event.getClickedBlock(); //null returned here means interacting with air
-		
 		Material clickedBlockType = null;
+
 		if(clickedBlock != null)
 		{
-		    clickedBlockType = clickedBlock.getType();
+			clickedBlockType = clickedBlock.getType();
 		}
 		else
 		{
-		    clickedBlockType = Material.AIR;
+			clickedBlockType = Material.AIR;
+		}
+
+
+		//prevent crop trample
+	    if(action == Action.PHYSICAL) {
+			if (clickedBlock != null && clickedBlockType == Material.SOIL && GriefPrevention.instance.allowBreak(player, clickedBlock, clickedBlock.getLocation()) != null) {
+				event.setCancelled(true);
+			}
+			return;
 		}
 		
 		//don't care about left-clicking on most blocks, this is probably a break action
