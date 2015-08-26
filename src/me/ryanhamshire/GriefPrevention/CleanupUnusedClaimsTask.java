@@ -22,6 +22,7 @@ import java.util.Calendar;
 import java.util.Random;
 import java.util.Vector;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.World;
 
@@ -80,7 +81,7 @@ class CleanupUnusedClaimsTask implements Runnable
 		//if this claim is a chest claim and those are set to expire
         if(claim.getArea() <= areaOfDefaultClaim && GriefPrevention.instance.config_claims_chestClaimExpirationDays > 0)
 		{
-            playerData = GriefPrevention.instance.dataStore.getPlayerData(claim.ownerID);
+            playerData = GriefPrevention.instance.dataStore.getPlayerData(Bukkit.getPlayer(claim.ownerID));
             
             //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
 	        Calendar sevenDaysAgo = Calendar.getInstance();
@@ -105,7 +106,7 @@ class CleanupUnusedClaimsTask implements Runnable
 		//if configured to always remove claims after some inactivity period without exceptions...
 		else if(GriefPrevention.instance.config_claims_expirationDays > 0)
 		{
-			if(playerData == null) playerData = GriefPrevention.instance.dataStore.getPlayerData(claim.ownerID);
+			if(playerData == null) playerData = GriefPrevention.instance.dataStore.getPlayerData(Bukkit.getPlayer(claim.ownerID));
 		    Calendar earliestPermissibleLastLogin = Calendar.getInstance();
 			earliestPermissibleLastLogin.add(Calendar.DATE, -GriefPrevention.instance.config_claims_expirationDays);
 			
@@ -147,7 +148,7 @@ class CleanupUnusedClaimsTask implements Runnable
 			
 			if(investmentScore < minInvestment)
 			{
-			    playerData = GriefPrevention.instance.dataStore.getPlayerData(claim.ownerID);
+			    playerData = GriefPrevention.instance.dataStore.getPlayerData(Bukkit.getPlayer(claim.ownerID));
 	            
 	            //if the owner has been gone at least a week, and if he has ONLY the new player claim, it will be removed
 	            Calendar sevenDaysAgo = Calendar.getInstance();

@@ -52,7 +52,7 @@ class DeliverClaimBlocksTask implements Runnable
 	    else
 	    {
 	        DataStore dataStore = GriefPrevention.instance.dataStore;
-            PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = dataStore.getPlayerData(player);
             
             Location lastLocation = playerData.lastAfkCheckLocation;
             try
