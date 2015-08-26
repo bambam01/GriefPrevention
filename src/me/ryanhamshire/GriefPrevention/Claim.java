@@ -361,6 +361,16 @@ public class Claim
 		ClaimPermission permissionLevel = this.playerIDToClaimPermissionMap.get("public");
 		if(ClaimPermission.Build == permissionLevel) return null;
 		
+		//allow for farming with /containertrust permission
+        if(this.allowContainers(player) == null)
+        {
+            //do allow for farming, if player has /containertrust permission
+            if(this.placeableForFarming(material))
+            {
+                return null;
+            }
+        }
+		
 		//subdivision permission inheritance
 		if(this.parent != null)
 			return this.parent.allowBuild(player, material);
@@ -370,17 +380,7 @@ public class Claim
 		if(player.hasPermission("griefprevention.ignoreclaims"))
 				reason += "  " + GriefPrevention.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
 		
-		//allow for farming with /containertrust permission
-		if(reason != null && this.allowContainers(player) == null)
-        {
-            //do allow for farming, if player has /containertrust permission
-            if(this.placeableForFarming(material))
-            {
-                return null;
-            }
-        }
-        
-        return reason;
+		return reason;
 	}
 	
 	private boolean hasExplicitPermission(Player player, ClaimPermission level)
@@ -580,6 +580,7 @@ public class Claim
 	public void clearPermissions()
 	{
 		this.playerIDToClaimPermissionMap.clear();
+		this.managers.clear();
 		
 		for(Claim child : this.children)
         {
@@ -874,7 +875,6 @@ public class Claim
     public ArrayList<String> getChunkStrings()
     {
         ArrayList<String> chunkStrings = new ArrayList<String>();
-        World world = this.getLesserBoundaryCorner().getWorld();
         int smallX = this.getLesserBoundaryCorner().getBlockX() >> 4;
         int smallZ = this.getLesserBoundaryCorner().getBlockZ() >> 4;
 		int largeX = this.getGreaterBoundaryCorner().getBlockX() >> 4;
@@ -884,8 +884,7 @@ public class Claim
 		{
 		    for(int z = smallZ; z <= largeZ; z++)
 		    {
-		        StringBuilder builder = new StringBuilder(String.valueOf(x)).append(world.getName()).append(z);
-		        chunkStrings.add(builder.toString());
+		        chunkStrings.add(String.valueOf(x) + z);
 		    }
 		}
 		
