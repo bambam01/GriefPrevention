@@ -118,7 +118,7 @@ public class BlockEventHandler implements Listener
         }
 		
 		//if not empty and wasn't the same as the last sign, log it and remember it for later
-		PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+		PlayerData playerData = this.dataStore.getPlayerData(player);
 		if(notEmpty && playerData.lastMessage != null && !playerData.lastMessage.equals(signMessage))
 		{		
 			GriefPrevention.AddLogEntry(lines.toString().replace("\n  ", ";"), null);
@@ -199,7 +199,7 @@ public class BlockEventHandler implements Listener
 		}
 		
 		//if the block is being placed within or under an existing claim
-		PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+		PlayerData playerData = this.dataStore.getPlayerData(player);
 		Claim claim = this.dataStore.getClaimAt(block.getLocation(), true, playerData.lastClaim);
 		if(claim != null)
 		{

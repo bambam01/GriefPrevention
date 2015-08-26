@@ -320,7 +320,7 @@ public abstract class DataStore
 		PlayerData ownerData = null;
 		if(!claim.isAdminClaim())
 		{
-			ownerData = this.getPlayerData(claim.ownerID);
+			ownerData = this.getPlayerData(Bukkit.getPlayer(claim.ownerID));
 		}
 		
 		//determine new owner
@@ -328,7 +328,7 @@ public abstract class DataStore
 		
 		if(newOwnerID != null)
 	    {
-		    newOwnerData = this.getPlayerData(newOwnerID);
+		    newOwnerData = this.getPlayerData(Bukkit.getPlayer(newOwnerID));
 	    }
 		
 		//transfer
@@ -382,7 +382,7 @@ public abstract class DataStore
 		//except for administrative claims (which have no owner), update the owner's playerData with the new claim
 		if(!newClaim.isAdminClaim() && writeToStorage)
 		{
-			PlayerData ownerData = this.getPlayerData(newClaim.ownerID);
+			PlayerData ownerData = this.getPlayerData(Bukkit.getPlayer(newClaim.ownerID));
 			ownerData.getClaims().add(newClaim);
 			this.savePlayerData(newClaim.ownerID, ownerData);
 		}
@@ -469,21 +469,21 @@ public abstract class DataStore
 	
 	//retrieves player data from memory or secondary storage, as necessary
 	//if the player has never been on the server before, this will return a fresh player data with default values
-	synchronized public PlayerData getPlayerData(UUID playerID)
+	synchronized public PlayerData getPlayerData(Player player)
 	{
-		//first, look in memory
-		PlayerData playerData = this.playerNameToPlayerDataMap.get(playerID);
-		
-		//if not there, build a fresh instance with some blanks for what may be in secondary storage
-		if(playerData == null)
-		{
-			playerData = new PlayerData();
-			playerData.playerID = playerID;
-			
-			//shove that new player data into the hash map cache
-			this.playerNameToPlayerDataMap.put(playerID, playerData);
-		}
-		
+		PlayerData playerData = null;
+		if(player.isOnline()) {
+			//first, look in memory
+			playerData = this.playerNameToPlayerDataMap.get(player.getUniqueId());
+			//if not there, build a fresh instance with some blanks for what may be in secondary storage
+			if(playerData == null)
+			{
+				playerData = new PlayerData();
+				playerData.playerID = player.getUniqueId();
+				//shove that new player data into the hash map cache
+				this.playerNameToPlayerDataMap.put(player.getUniqueId(), playerData);
+			}
+		} else playerData = new PlayerData();
 		return playerData;
 	}
 	
@@ -546,7 +546,7 @@ public abstract class DataStore
 		//update player data, except for administrative claims, which have no owner
 		if(!claim.isAdminClaim())
 		{
-			PlayerData ownerData = this.getPlayerData(claim.ownerID);
+			PlayerData ownerData = this.getPlayerData(Bukkit.getPlayer(claim.ownerID));
 			for(int i = 0; i < ownerData.getClaims().size(); i++)
 			{
 				if(ownerData.getClaims().get(i).id.equals(claim.id))
@@ -795,8 +795,8 @@ public abstract class DataStore
 	{
 		//fill-in the necessary SiegeData instance
 		SiegeData siegeData = new SiegeData(attacker, defender, defenderClaim);
-		PlayerData attackerData = this.getPlayerData(attacker.getUniqueId());
-		PlayerData defenderData = this.getPlayerData(defender.getUniqueId());
+		PlayerData attackerData = this.getPlayerData(attacker);
+		PlayerData defenderData = this.getPlayerData(defender);
 		attackerData.siegeData = siegeData;
 		defenderData.siegeData = siegeData;
 		defenderClaim.siegeData = siegeData;
@@ -844,10 +844,10 @@ public abstract class DataStore
 			grantAccess = true;
 		}
 		
-		PlayerData attackerData = this.getPlayerData(siegeData.attacker.getUniqueId());
+		PlayerData attackerData = this.getPlayerData(siegeData.attacker);
 		attackerData.siegeData = null;
 		
-		PlayerData defenderData = this.getPlayerData(siegeData.defender.getUniqueId());	
+		PlayerData defenderData = this.getPlayerData(siegeData.defender);
 		defenderData.siegeData = null;
 		defenderData.lastSiegeEndTimeStamp = System.currentTimeMillis();
 
@@ -948,7 +948,7 @@ public abstract class DataStore
 		}
 		
 		//look for genderal defender cooldown
-        PlayerData defenderData = this.getPlayerData(defender.getUniqueId());
+        PlayerData defenderData = this.getPlayerData(defender);
 		if(defenderData.lastSiegeEndTimeStamp > 0)
         {
             long now = System.currentTimeMillis();
@@ -978,7 +978,7 @@ public abstract class DataStore
 	//extend a siege, if it's possible to do so
 	synchronized void tryExtendSiege(Player player, Claim claim)
 	{
-		PlayerData playerData = this.getPlayerData(player.getUniqueId());
+		PlayerData playerData = this.getPlayerData(player);
 		
 		//player must be sieged
 		if(playerData.siegeData == null) return;
