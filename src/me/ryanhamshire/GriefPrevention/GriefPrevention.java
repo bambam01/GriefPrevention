@@ -29,13 +29,7 @@ import java.util.regex.Pattern;
 import me.ryanhamshire.GriefPrevention.DataStore.NoTransferException;
 import net.milkbowl.vault.economy.Economy;
 
-import org.bukkit.ChatColor;
-import org.bukkit.Chunk;
-import org.bukkit.GameMode;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.World.Environment;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -2254,7 +2248,38 @@ public class GriefPrevention extends JavaPlugin
             GriefPrevention.sendMessage(player, TextMode.Success, Messages.UnSeparateConfirmation);
             
             return true;
-        }
+        } else if(cmd.getName().equalsIgnoreCase("removeworldclaims")) {
+			// Need just 1 argument
+			if(args.length != 1 && args.length != 2 || args.length == 2 && !args[1].equals("true")) return false;
+			boolean ignoreAdminClaims = args.length == 2 && args[1].equals("true");
+			// Get the specified world
+			World world = Bukkit.getWorld(args[0]);
+			Vector<Claim> claims = new Vector<Claim>();
+			for(Claim claim : this.dataStore.claims) {
+				if (claim.ownerID != null || !ignoreAdminClaims)
+					for (Chunk chunk : claim.getChunks()) {
+						if (chunk.getWorld() == world) claims.add(claim);
+					}
+			}
+			if(claims.size() > 0) {
+				for (Claim claim : claims) {
+					claim.removeSurfaceFluids(null);
+					this.dataStore.deleteClaim(claim, true);
+					// If in a creative mode world, restore the claim area
+					if(GriefPrevention.instance.creativeRulesApply(claim.getLesserBoundaryCorner())) {
+						if(ignoreAdminClaims) GriefPrevention.AddLogEntry(sender.getName() + " removed a claim @ " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + " using /RemoveWorldClaims " + world.getName() + " true");
+						else GriefPrevention.AddLogEntry(sender.getName() + " removed a claim @ " + GriefPrevention.getfriendlyLocationString(claim.getLesserBoundaryCorner()) + " using /RemoveWorldClaims " + world.getName());
+						GriefPrevention.instance.restoreClaim(claim, 20L * 60 * 2);
+					}
+					// Revert any current visualization
+					if(player != null) Visualization.Revert(player);
+				}
+				// Send a message confirming the action
+				if(ignoreAdminClaims) GriefPrevention.sendMessage(player, TextMode.Success, "All claims from world \"" + world.getName() + "\", but the admin ones, were deleted successfully!");
+				else GriefPrevention.sendMessage(player, TextMode.Success, "All claims from world \"" + world.getName() + "\" were deleted successfully!");
+			} else GriefPrevention.sendMessage(player, TextMode.Err, "There aren't any claims in that world!");
+			return true;
+		}
 		
 		return false; 
 	}
