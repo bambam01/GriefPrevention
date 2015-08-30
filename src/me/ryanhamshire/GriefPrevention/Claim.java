@@ -345,14 +345,14 @@ public class Claim
 		}
 		
 		//no building while in pvp combat
-		PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+		PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player);
 		if(playerData.inPvpCombat())
 		{
 			return GriefPrevention.instance.dataStore.getMessage(Messages.NoBuildPvP);			
 		}
 		
 		//owners can make changes, or admins with ignore claims mode enabled
-		if(player.getUniqueId().equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId()).ignoreClaims) return null;
+		if(player.getUniqueId().equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(player).ignoreClaims) return null;
 		
 		//anyone with explicit build permission can make changes
 		if(this.hasExplicitPermission(player, ClaimPermission.Build)) return null;
@@ -391,7 +391,7 @@ public class Claim
 		while(iterator.hasNext())
 		{
 			String identifier = iterator.next();
-			if(playerID.equalsIgnoreCase(identifier) && this.playerIDToClaimPermissionMap.get(identifier) == level) return true;
+			if(playerID.equalsIgnoreCase(identifier) || player.getDisplayName().equalsIgnoreCase(identifier) && this.playerIDToClaimPermissionMap.get(identifier) == level) return true;
 			
 			else if(identifier.startsWith("[") && identifier.endsWith("]"))
 			{
@@ -460,7 +460,7 @@ public class Claim
 		}
 		
 		//claim owner and admins in ignoreclaims mode have access
-		if(player.getUniqueId().equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId()).ignoreClaims) return null;
+		if(player.getUniqueId().equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(player).ignoreClaims) return null;
 		
 		//look for explicit individual access, inventory, or build permission
 		if(this.hasExplicitPermission(player, ClaimPermission.Access)) return null;
@@ -498,7 +498,7 @@ public class Claim
 		}
 		
 		//owner and administrators in ignoreclaims mode have access
-		if(player.getUniqueId().equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId()).ignoreClaims) return null;
+		if(player.getUniqueId().equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(player).ignoreClaims) return null;
 		
 		//admin claims need adminclaims permission only.
 		if(this.isAdminClaim())

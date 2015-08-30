@@ -18,10 +18,6 @@
 
 package me.ryanhamshire.GriefPrevention;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -36,24 +32,17 @@ import org.bukkit.entity.minecart.HopperMinecart;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockBurnEvent;
-import org.bukkit.event.block.BlockDispenseEvent;
-import org.bukkit.event.block.BlockFromToEvent;
-import org.bukkit.event.block.BlockIgniteEvent;
+import org.bukkit.event.block.*;
 import org.bukkit.event.block.BlockIgniteEvent.IgniteCause;
-import org.bukkit.event.block.BlockMultiPlaceEvent;
-import org.bukkit.event.block.BlockPistonExtendEvent;
-import org.bukkit.event.block.BlockPistonRetractEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.block.BlockSpreadEvent;
-import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.inventory.InventoryPickupItemEvent;
 import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.Dispenser;
 import org.bukkit.metadata.MetadataValue;
+
+import java.util.ArrayList;
+import java.util.List;
 
 //event handlers related to blocks
 public class BlockEventHandler implements Listener 
@@ -129,7 +118,7 @@ public class BlockEventHandler implements Listener
         }
 		
 		//if not empty and wasn't the same as the last sign, log it and remember it for later
-		PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+		PlayerData playerData = this.dataStore.getPlayerData(player);
 		if(notEmpty && playerData.lastMessage != null && !playerData.lastMessage.equals(signMessage))
 		{		
 			GriefPrevention.AddLogEntry(player.getName() + lines.toString().replace("\n  ", ";"), null);
@@ -138,8 +127,7 @@ public class BlockEventHandler implements Listener
 			
 			if(!player.hasPermission("griefprevention.eavesdropsigns"))
 			{
-				Collection<Player> players = (Collection<Player>)GriefPrevention.instance.getServer().getOnlinePlayers();
-				for(Player otherPlayer : players)
+				for(Player otherPlayer : GriefPrevention.instance.getServer().getOnlinePlayers())
 				{
 					if(otherPlayer.hasPermission("griefprevention.eavesdropsigns"))
 					{
@@ -211,7 +199,7 @@ public class BlockEventHandler implements Listener
 		}
 		
 		//if the block is being placed within or under an existing claim
-		PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+		PlayerData playerData = this.dataStore.getPlayerData(player);
 		Claim claim = this.dataStore.getClaimAt(block.getLocation(), true, playerData.lastClaim);
 		if(claim != null)
 		{
@@ -500,7 +488,8 @@ public class BlockEventHandler implements Listener
     		        event.setCancelled(true);
     		        return;
     		    }
-    		    
+				// not 1.7 compatible
+				/*
     		    for(Block movedBlock : event.getBlocks())
     		    {
     		        //if pulled block isn't in the same land claim, cancel the event
@@ -510,6 +499,7 @@ public class BlockEventHandler implements Listener
         		        return;
         		    }
     		    }
+    		    */
     		}
     		
     		//otherwise, consider ownership of both piston and block
@@ -522,6 +512,9 @@ public class BlockEventHandler implements Listener
                 if(pistonClaim != null) pistonOwnerName = pistonClaim.getOwnerName();
     		    
     		    String movingBlockOwnerName = "_";
+
+				// not 1.7 compatible
+				/*
         		for(Block movedBlock : event.getBlocks())
         		{
         		    //who owns the moving block, if anyone?
@@ -535,6 +528,7 @@ public class BlockEventHandler implements Listener
             			event.setCancelled(true);
             		}
         		}
+        		*/
     		}
 		}
 		catch(NoSuchMethodError exception)
