@@ -3,7 +3,7 @@ main: me.ryanhamshire.GriefPrevention.GriefPrevention
 softdepend: [Vault, Multiverse-Core, My Worlds, MystCraft, Transporter, TheUnderground, WorldGuard, WorldEdit, RoyalCommands]
 dev-url: http://dev.bukkit.org/server-mods/grief-prevention
 loadbefore: [TheUnderground]
-version: 12.2
+version: 12.2-CUSTOM
 commands:
    abandonclaim:
       description: Deletes a claim.
@@ -183,6 +183,10 @@ commands:
       description: Gives a player a replacement land claiming book.
       usage: /ClaimBook <player>
       permission: griefprevention.claimbook
+   removeworldclaims:
+      description: Removes all claims from a world. If specified "true", admin claims will be ignored.
+      usage: /RemoveWorldClaims <world> [true]
+      permissions: griefprevention.removeworldclaims
 permissions:
     griefprevention.createclaims:
         description: Grants permission to create claims.
@@ -210,6 +214,7 @@ permissions:
             griefprevention.separate: true
             griefprevention.eavesdropsigns: true
             griefprevention.claimbook: true
+            griefprevention.removeworldclaims: true
     griefprevention.siegeimmune:
         description: Makes a player immune to /Siege.
         default: op
@@ -284,4 +289,7 @@ permissions:
         default: true
     griefprevention.claimbook:
         description: Grants access to /ClaimBook.
+        default: op
+    griefprevention.removeworldclaims:
+        description: Grants access to /RemoveWorldClaims.
         default: op

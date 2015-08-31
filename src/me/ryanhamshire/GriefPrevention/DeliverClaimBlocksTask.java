@@ -18,8 +18,6 @@
  
  package me.ryanhamshire.GriefPrevention;
 
-import java.util.Collection;
-
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
@@ -43,10 +41,9 @@ class DeliverClaimBlocksTask implements Runnable
 	    //if no player specified, this task will create a player-specific task for each online player, scheduled one tick apart
 	    if(this.player == null)
 		{
-	        Collection<Player> players = (Collection<Player>)GriefPrevention.instance.getServer().getOnlinePlayers();
 	        
 	        long i = 0;
-	        for(Player onlinePlayer : players)
+	        for(Player onlinePlayer : GriefPrevention.instance.getServer().getOnlinePlayers())
 	        {
 	            DeliverClaimBlocksTask newTask = new DeliverClaimBlocksTask(onlinePlayer);
 	            GriefPrevention.instance.getServer().getScheduler().scheduleSyncDelayedTask(GriefPrevention.instance, newTask, i++);
@@ -57,7 +54,7 @@ class DeliverClaimBlocksTask implements Runnable
 	    else
 	    {
 	        DataStore dataStore = GriefPrevention.instance.dataStore;
-            PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = dataStore.getPlayerData(player);
             
             Location lastLocation = playerData.lastAfkCheckLocation;
             try

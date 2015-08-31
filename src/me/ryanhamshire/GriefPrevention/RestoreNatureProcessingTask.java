@@ -18,13 +18,13 @@
  
 package me.ryanhamshire.GriefPrevention;
 
-import java.util.ArrayList;
-
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World.Environment;
 import org.bukkit.block.Biome;
 import org.bukkit.entity.Player;
+
+import java.util.ArrayList;
 
 //non-main-thread task which processes world data to repair the unnatural
 //after processing is complete, creates a main thread task to make the necessary changes to the world
