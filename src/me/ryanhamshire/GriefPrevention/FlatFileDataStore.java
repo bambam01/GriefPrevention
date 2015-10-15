@@ -697,7 +697,7 @@ public class FlatFileDataStore extends DataStore
 			if(file.getName().endsWith(".ignore")) continue;
 			
 			UUID playerID = UUID.fromString(file.getName());
-			databaseStore.savePlayerData(playerID, this.getPlayerData(Bukkit.getPlayer(playerID)));
+			databaseStore.savePlayerData(playerID, this.getPlayerData(playerID));
 			this.clearCachedPlayerData(playerID);
 		}
 		

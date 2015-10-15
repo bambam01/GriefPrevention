@@ -18,6 +18,8 @@
  
  package me.ryanhamshire.GriefPrevention;
 
+import java.util.Collection;
+
 import org.bukkit.entity.Player;
 
 //secures a claim after a siege looting window has closed
@@ -41,7 +43,8 @@ class SecureClaimTask implements Runnable
 			claim.doorsOpen = false;
 			
 			//eject bad guys
-			for(Player player : GriefPrevention.instance.getServer().getOnlinePlayers())
+			Collection<Player> onlinePlayers = (Collection<Player>)GriefPrevention.instance.getServer().getOnlinePlayers();
+			for(Player player : onlinePlayers)
 			{
 				if(claim.contains(player.getLocation(), false, false) && claim.allowAccess(player) != null)
 				{

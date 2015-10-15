@@ -18,17 +18,59 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.UUID;
+
 import me.ryanhamshire.GriefPrevention.events.PreventPvPEvent;
-import org.bukkit.*;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.World;
 import org.bukkit.World.Environment;
 import org.bukkit.block.Block;
-import org.bukkit.entity.*;
+import org.bukkit.entity.Animals;
+import org.bukkit.entity.Creature;
+import org.bukkit.entity.Creeper;
+import org.bukkit.entity.Enderman;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Explosive;
+import org.bukkit.entity.FallingBlock;
+import org.bukkit.entity.Horse;
+import org.bukkit.entity.Item;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Monster;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.entity.Tameable;
+import org.bukkit.entity.ThrownPotion;
+import org.bukkit.entity.Villager;
+import org.bukkit.entity.WaterMob;
+
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.*;
+import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
+import org.bukkit.event.entity.EntityBreakDoorEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityInteractEvent;
+import org.bukkit.event.entity.ExpBottleEvent;
+import org.bukkit.event.entity.ItemSpawnEvent;
+import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingBreakEvent;
 import org.bukkit.event.hanging.HangingBreakEvent.RemoveCause;
@@ -41,8 +83,6 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.util.Vector;
-
-import java.util.*;
 
 //handles events related to entities
 public class EntityEventHandler implements Listener
@@ -57,7 +97,7 @@ public class EntityEventHandler implements Listener
 	
 	//don't allow endermen to change blocks
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
-	public void onEntityChangeBlock(EntityChangeBlockEvent event)
+	public void onEntityChangeBLock(EntityChangeBlockEvent event)
 	{
 	    if(!GriefPrevention.instance.config_endermenMoveBlocks && event.getEntityType() == EntityType.ENDERMAN)
 		{
@@ -163,6 +203,13 @@ public class EntityEventHandler implements Listener
 	{		
 		this.handleExplosion(explodeEvent.getLocation(), explodeEvent.getEntity(), explodeEvent.blockList());
 	}
+	
+	//when a block explodes...
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
+    public void onBlockExplode(BlockExplodeEvent explodeEvent)
+    {       
+        this.handleExplosion(explodeEvent.getBlock().getLocation(), null, explodeEvent.blockList());
+    }
     
     void handleExplosion(Location location, Entity entity, List<Block> blocks)
     {
@@ -310,7 +357,7 @@ public class EntityEventHandler implements Listener
 		
 		//chicken eggs and breeding could potentially make a mess in the wilderness, once griefers get involved
 		SpawnReason reason = event.getSpawnReason();
-		if(reason != SpawnReason.SPAWNER_EGG && reason != SpawnReason.BUILD_IRONGOLEM && reason != SpawnReason.BUILD_SNOWMAN)
+		if(reason != SpawnReason.SPAWNER_EGG && reason != SpawnReason.BUILD_IRONGOLEM && reason != SpawnReason.BUILD_SNOWMAN && event.getEntityType() != EntityType.ARMOR_STAND)
 		{
 			event.setCancelled(true);
 			return;
@@ -347,7 +394,7 @@ public class EntityEventHandler implements Listener
 		if(!(entity instanceof Player)) return;  //only tracking players
 		
 		Player player = (Player)entity;
-		PlayerData playerData = this.dataStore.getPlayerData(player);
+		PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 		
 		//if involved in a siege
 		if(playerData.siegeData != null)
@@ -469,7 +516,7 @@ public class EntityEventHandler implements Listener
 		//otherwise, apply entity-count limitations for creative worlds
 		else if(GriefPrevention.instance.creativeRulesApply(event.getEntity().getLocation()))
 		{
-			PlayerData playerData = this.dataStore.getPlayerData(event.getPlayer());
+			PlayerData playerData = this.dataStore.getPlayerData(event.getPlayer().getUniqueId());
 			Claim claim = this.dataStore.getClaimAt(event.getBlock().getLocation(), false, playerData.lastClaim);
 			if(claim == null) return;
 			
@@ -549,8 +596,8 @@ public class EntityEventHandler implements Listener
 			
 			if(attacker != defender)
 			{
-    			PlayerData defenderData = this.dataStore.getPlayerData((Player)event.getEntity());
-    			PlayerData attackerData = this.dataStore.getPlayerData(attacker);
+    			PlayerData defenderData = this.dataStore.getPlayerData(((Player)event.getEntity()).getUniqueId());
+    			PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
     			
     			//otherwise if protecting spawning players
     			if(GriefPrevention.instance.config_pvp_protectFreshSpawns)
@@ -627,6 +674,7 @@ public class EntityEventHandler implements Listener
 	        
 	        //if the damaged entity is a claimed item frame or armor stand, the damager needs to be a player with container trust in the claim
 		    if(subEvent.getEntityType() == EntityType.ITEM_FRAME
+		       || subEvent.getEntityType() == EntityType.ARMOR_STAND
 		       || subEvent.getEntityType() == EntityType.VILLAGER)
 		    {
 		        //allow for disabling villager protections in the config
@@ -637,7 +685,7 @@ public class EntityEventHandler implements Listener
                 PlayerData playerData = null;
                 if(attacker != null)
                 {
-                    playerData = this.dataStore.getPlayerData(attacker);
+                    playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
                     cachedClaim = playerData.lastClaim;
                 }
                 
@@ -688,7 +736,7 @@ public class EntityEventHandler implements Listener
     		                if(attacker.getUniqueId().equals(ownerID)) return;
     		                
     		                //allow for admin override
-    		                PlayerData attackerData = this.dataStore.getPlayerData(attacker);
+    		                PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
     		                if(attackerData.ignoreClaims) return;
     		               
     		                //otherwise disallow in non-pvp worlds
@@ -726,7 +774,7 @@ public class EntityEventHandler implements Listener
 				
 				if(attacker != null)
 				{
-					playerData = this.dataStore.getPlayerData(attacker);
+					playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
 					cachedClaim = playerData.lastClaim;
 				}
 				
@@ -828,8 +876,8 @@ public class EntityEventHandler implements Listener
         //if attacker not a player, do nothing
         if(attacker == null) return;
         
-        PlayerData defenderData = this.dataStore.getPlayerData(defender);
-        PlayerData attackerData = this.dataStore.getPlayerData(attacker);
+        PlayerData defenderData = this.dataStore.getPlayerData(defender.getUniqueId());
+        PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
         
         if(attacker != defender)
         {
@@ -891,7 +939,7 @@ public class EntityEventHandler implements Listener
 		
 		if(attacker != null)
 		{
-			playerData = this.dataStore.getPlayerData(attacker);
+			playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
 			cachedClaim = playerData.lastClaim;
 		}
 		
@@ -983,8 +1031,8 @@ public class EntityEventHandler implements Listener
 	            else if(GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims || GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims)
 	            {
 	                Player effectedPlayer = (Player)effected;
-	                PlayerData defenderData = this.dataStore.getPlayerData(effectedPlayer);
-	                PlayerData attackerData = this.dataStore.getPlayerData(thrower);
+	                PlayerData defenderData = this.dataStore.getPlayerData(effectedPlayer.getUniqueId());
+	                PlayerData attackerData = this.dataStore.getPlayerData(thrower.getUniqueId());
 	                Claim attackerClaim = this.dataStore.getClaimAt(thrower.getLocation(), false, attackerData.lastClaim);
 	                if( attackerClaim != null && 
 	                    (attackerClaim.isAdminClaim() && attackerClaim.parent == null && GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims ||
