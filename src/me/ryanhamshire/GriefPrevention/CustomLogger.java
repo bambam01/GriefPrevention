@@ -61,7 +61,7 @@ class CustomLogger
         }
     }
     
-    private static final Pattern inlineFormatterPattern = Pattern.compile("§."); 
+    private static final Pattern inlineFormatterPattern = Pattern.compile("\u00A7."); 
     void AddEntry(String entry, CustomLogEntryTypes entryType)
     {
         //if disabled, do nothing

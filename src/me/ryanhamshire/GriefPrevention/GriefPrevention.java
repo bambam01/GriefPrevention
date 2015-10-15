@@ -357,8 +357,7 @@ public class GriefPrevention extends JavaPlugin
 		namesThread.start();
 		
 		//load ignore lists for any already-online players
-		Collection<Player> players = (Collection<Player>)GriefPrevention.instance.getServer().getOnlinePlayers();
-		for(Player player : players)
+		for(Player player : GriefPrevention.instance.getServer().getOnlinePlayers())
 		{
 		    new IgnoreLoaderThread(player.getUniqueId(), this.dataStore.getPlayerData(player.getUniqueId()).ignoredPlayers).start();
 		}
@@ -2653,8 +2652,7 @@ public class GriefPrevention extends JavaPlugin
 	public void onDisable()
 	{ 
 		//save data for any online players
-		Collection<Player> players = (Collection<Player>)this.getServer().getOnlinePlayers();
-		for(Player player : players)
+		for(Player player : GriefPrevention.instance.getServer().getOnlinePlayers())
 		{
 			UUID playerID = player.getUniqueId();
 			PlayerData playerData = this.dataStore.getPlayerData(playerID);

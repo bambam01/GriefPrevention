@@ -138,8 +138,7 @@ public class BlockEventHandler implements Listener
 			
 			if(!player.hasPermission("griefprevention.eavesdropsigns"))
 			{
-				Collection<Player> players = (Collection<Player>)GriefPrevention.instance.getServer().getOnlinePlayers();
-				for(Player otherPlayer : players)
+				for(Player otherPlayer : GriefPrevention.instance.getServer().getOnlinePlayers())
 				{
 					if(otherPlayer.hasPermission("griefprevention.eavesdropsigns"))
 					{
@@ -501,10 +500,10 @@ public class BlockEventHandler implements Listener
     		        return;
     		    }
     		    
-    		    for(Block movedBlock : event.getBlocks())
-    		    {
+        		if(event.getBlock().getType() == Material.PISTON_STICKY_BASE)
+        		{
     		        //if pulled block isn't in the same land claim, cancel the event
-        		    if(!pistonClaim.contains(movedBlock.getLocation(), false, false))
+        		    if(!pistonClaim.contains(event.getRetractLocation(), false, false))
         		    {
         		        event.setCancelled(true);
         		        return;
@@ -522,10 +521,10 @@ public class BlockEventHandler implements Listener
                 if(pistonClaim != null) pistonOwnerName = pistonClaim.getOwnerName();
     		    
     		    String movingBlockOwnerName = "_";
-        		for(Block movedBlock : event.getBlocks())
+        		if(event.getBlock().getType() == Material.PISTON_STICKY_BASE)
         		{
         		    //who owns the moving block, if anyone?
-                    Claim movingBlockClaim = this.dataStore.getClaimAt(movedBlock.getLocation(), false, pistonClaim);
+                    Claim movingBlockClaim = this.dataStore.getClaimAt(event.getRetractLocation(), false, pistonClaim);
             		if(movingBlockClaim != null) movingBlockOwnerName = movingBlockClaim.getOwnerName();
             		
             		//if there are owners for the blocks, they must be the same player

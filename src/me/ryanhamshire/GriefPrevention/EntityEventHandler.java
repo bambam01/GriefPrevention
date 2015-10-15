@@ -57,7 +57,6 @@ import org.bukkit.entity.WaterMob;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
 import org.bukkit.event.entity.EntityBreakDoorEvent;
@@ -97,7 +96,7 @@ public class EntityEventHandler implements Listener
 	
 	//don't allow endermen to change blocks
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
-	public void onEntityChangeBLock(EntityChangeBlockEvent event)
+	public void onEntityChangeBlock(EntityChangeBlockEvent event)
 	{
 	    if(!GriefPrevention.instance.config_endermenMoveBlocks && event.getEntityType() == EntityType.ENDERMAN)
 		{
@@ -204,12 +203,14 @@ public class EntityEventHandler implements Listener
 		this.handleExplosion(explodeEvent.getLocation(), explodeEvent.getEntity(), explodeEvent.blockList());
 	}
 	
+	/*
 	//when a block explodes...
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void onBlockExplode(BlockExplodeEvent explodeEvent)
     {       
         this.handleExplosion(explodeEvent.getBlock().getLocation(), null, explodeEvent.blockList());
     }
+    */
     
     void handleExplosion(Location location, Entity entity, List<Block> blocks)
     {
@@ -357,7 +358,7 @@ public class EntityEventHandler implements Listener
 		
 		//chicken eggs and breeding could potentially make a mess in the wilderness, once griefers get involved
 		SpawnReason reason = event.getSpawnReason();
-		if(reason != SpawnReason.SPAWNER_EGG && reason != SpawnReason.BUILD_IRONGOLEM && reason != SpawnReason.BUILD_SNOWMAN && event.getEntityType() != EntityType.ARMOR_STAND)
+		if(reason != SpawnReason.SPAWNER_EGG && reason != SpawnReason.BUILD_IRONGOLEM && reason != SpawnReason.BUILD_SNOWMAN)
 		{
 			event.setCancelled(true);
 			return;
@@ -674,7 +675,6 @@ public class EntityEventHandler implements Listener
 	        
 	        //if the damaged entity is a claimed item frame or armor stand, the damager needs to be a player with container trust in the claim
 		    if(subEvent.getEntityType() == EntityType.ITEM_FRAME
-		       || subEvent.getEntityType() == EntityType.ARMOR_STAND
 		       || subEvent.getEntityType() == EntityType.VILLAGER)
 		    {
 		        //allow for disabling villager protections in the config
