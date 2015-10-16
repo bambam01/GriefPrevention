@@ -47,7 +47,7 @@ public abstract class DataStore
 	
 	//in-memory cache for claim data
 	ArrayList<Claim> claims = new ArrayList<Claim>();
-	ConcurrentHashMap<String, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<String, ArrayList<Claim>>();
+	public ConcurrentHashMap<String, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<String, ArrayList<Claim>>();
 	
 	//in-memory cache for messages
 	private String [] messages;
