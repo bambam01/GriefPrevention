@@ -1181,7 +1181,7 @@ public class GriefPrevention extends JavaPlugin
 				if(!args[0].startsWith("(") || !args[0].endsWith(")"))
 				{
 					otherPlayer = this.resolvePlayerByName(args[0]);
-					if(!clearPermissions && otherPlayer == null && !args[0].equals("public"))
+					if(!clearPermissions && otherPlayer == null && !args[0].equals("public") && !TrustableFakePlayers.isTrustableFakePlayer(args[0]))
 					{
 						GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
 						return true;
@@ -2318,7 +2318,7 @@ public class GriefPrevention extends JavaPlugin
 	
 	private String trustEntryToPlayerName(String entry)
 	{
-        if(entry.startsWith("(") || entry.equals("public"))
+        if(entry.startsWith("(") || entry.equals("public") || TrustableFakePlayers.isTrustableFakePlayer(entry))
         {
             return entry;
         }
@@ -2399,6 +2399,7 @@ public class GriefPrevention extends JavaPlugin
 		
 		//validate player or group argument
 		String permission = null;
+		Boolean fakePlayer = null;
 		OfflinePlayer otherPlayer = null;
 		UUID recipientID = null;
 		if(recipientName.startsWith("(") && recipientName.endsWith(")"))
@@ -2418,8 +2419,8 @@ public class GriefPrevention extends JavaPlugin
 		else
 		{		
 			otherPlayer = this.resolvePlayerByName(recipientName);
-			if(otherPlayer == null && !recipientName.equals("public") && !recipientName.equals("all") &&
-					!TrustableFakePlayers.isTrustableFakePlayer(recipientName))
+			fakePlayer = TrustableFakePlayers.isTrustableFakePlayer(recipientName);
+			if(otherPlayer == null && !recipientName.equals("public") && !recipientName.equals("all") && !fakePlayer)
 			{
 				GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
 				return;
@@ -2430,7 +2431,7 @@ public class GriefPrevention extends JavaPlugin
 				recipientName = otherPlayer.getName();
 				recipientID = otherPlayer.getUniqueId();
 			}
-			else
+			else if(!fakePlayer)
 			{
 				recipientName = "public";
 			}
