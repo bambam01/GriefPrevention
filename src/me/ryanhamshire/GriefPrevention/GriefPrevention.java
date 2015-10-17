@@ -160,6 +160,7 @@ public class GriefPrevention extends JavaPlugin
 	public MaterialCollection config_mods_accessTrustIds;			//list of block IDs which should require /accesstrust for player interaction
 	public MaterialCollection config_mods_containerTrustIds;		//list of block IDs which should require /containertrust for player interaction
 	public List<String> config_mods_ignoreClaimsAccounts;			//list of player names which ALWAYS ignore claims
+	public List<String> config_mods_ignoreTrustAccounts;			//list of players which can be trusted without be online once (fakeplayers)
 	public MaterialCollection config_mods_explodableIds;			//list of block IDs which can be destroyed by explosions, even in claimed areas
 
 	public HashMap<String, Integer> config_seaLevelOverride;		//override for sea level, because bukkit doesn't report the right value for all situations
@@ -555,8 +556,10 @@ public class GriefPrevention extends JavaPlugin
         this.config_zombiesBreakDoors = config.getBoolean("GriefPrevention.HardModeZombiesBreakDoors", false);
         
         this.config_mods_ignoreClaimsAccounts = config.getStringList("GriefPrevention.Mods.PlayersIgnoringAllClaims");
+		this.config_mods_ignoreTrustAccounts = config.getStringList("GriefPrevention.Mods.TrustableFakePlayers");
         
         if(this.config_mods_ignoreClaimsAccounts == null) this.config_mods_ignoreClaimsAccounts = new ArrayList<String>();
+		if(this.config_mods_ignoreTrustAccounts == null) this.config_mods_ignoreTrustAccounts = new ArrayList<String>();
         
         this.config_mods_accessTrustIds = new MaterialCollection();
         List<String> accessTrustStrings = config.getStringList("GriefPrevention.Mods.BlockIdsRequiringAccessTrust");
@@ -797,6 +800,7 @@ public class GriefPrevention extends JavaPlugin
         outConfig.set("GriefPrevention.Mods.BlockIdsRequiringContainerTrust", this.config_mods_containerTrustIds);
         outConfig.set("GriefPrevention.Mods.BlockIdsExplodable", this.config_mods_explodableIds);
         outConfig.set("GriefPrevention.Mods.PlayersIgnoringAllClaims", this.config_mods_ignoreClaimsAccounts);
+		outConfig.set("GriefPrevention.Mods.TrustableFakePlayers", this.config_mods_ignoreTrustAccounts);
         outConfig.set("GriefPrevention.Mods.BlockIdsRequiringAccessTrust", accessTrustStrings);
         outConfig.set("GriefPrevention.Mods.BlockIdsRequiringContainerTrust", containerTrustStrings);
         outConfig.set("GriefPrevention.Mods.BlockIdsExplodable", explodableStrings);
@@ -1150,9 +1154,9 @@ public class GriefPrevention extends JavaPlugin
 			Claim claim = this.dataStore.getClaimAt(player.getLocation(), true /*ignore height*/, null);
 			
 			//bracket any permissions
-			if(args[0].contains(".") && !args[0].startsWith("[") && !args[0].endsWith("]"))
+			if(args[0].contains(".") && !args[0].startsWith("(") && !args[0].endsWith(")"))
 			{
-				args[0] = "[" + args[0] + "]";
+				args[0] = "(" + args[0] + ")";
 			}
 			
 			//determine whether a single player or clearing permissions entirely
@@ -1174,7 +1178,7 @@ public class GriefPrevention extends JavaPlugin
 			else
 			{
 				//validate player argument or group argument
-				if(!args[0].startsWith("[") || !args[0].endsWith("]"))
+				if(!args[0].startsWith("(") || !args[0].endsWith(")"))
 				{
 					otherPlayer = this.resolvePlayerByName(args[0]);
 					if(!clearPermissions && otherPlayer == null && !args[0].equals("public"))
@@ -1784,7 +1788,7 @@ public class GriefPrevention extends JavaPlugin
 			}
 			
 			//if granting blocks to all players with a specific permission
-			if(args[0].startsWith("[") && args[0].endsWith("]"))
+			if(args[0].startsWith("(") && args[0].endsWith(")"))
 			{
 				String permissionIdentifier = args[0].substring(1, args[0].length() - 1);
 				int newTotal = this.dataStore.adjustGroupBonusBlocks(permissionIdentifier, adjustment);
@@ -2314,7 +2318,7 @@ public class GriefPrevention extends JavaPlugin
 	
 	private String trustEntryToPlayerName(String entry)
 	{
-        if(entry.startsWith("[") || entry.equals("public"))
+        if(entry.startsWith("(") || entry.equals("public"))
         {
             return entry;
         }
@@ -2397,7 +2401,7 @@ public class GriefPrevention extends JavaPlugin
 		String permission = null;
 		OfflinePlayer otherPlayer = null;
 		UUID recipientID = null;
-		if(recipientName.startsWith("[") && recipientName.endsWith("]"))
+		if(recipientName.startsWith("(") && recipientName.endsWith(")"))
 		{
 			permission = recipientName.substring(1, recipientName.length() - 1);
 			if(permission == null || permission.isEmpty())
@@ -2406,7 +2410,6 @@ public class GriefPrevention extends JavaPlugin
 				return;
 			}
 		}
-		
 		else if(recipientName.contains("."))
 		{
 			permission = recipientName;
@@ -2415,7 +2418,8 @@ public class GriefPrevention extends JavaPlugin
 		else
 		{		
 			otherPlayer = this.resolvePlayerByName(recipientName);
-			if(otherPlayer == null && !recipientName.equals("public") && !recipientName.equals("all"))
+			if(otherPlayer == null && !recipientName.equals("public") && !recipientName.equals("all") &&
+					!TrustableFakePlayers.isTrustableFakePlayer(recipientName))
 			{
 				GriefPrevention.sendMessage(player, TextMode.Err, Messages.PlayerNotFound2);
 				return;
@@ -2504,7 +2508,7 @@ public class GriefPrevention extends JavaPlugin
 			String identifierToAdd = recipientName;
 			if(permission != null)
 			{
-			    identifierToAdd = "[" + permission + "]";
+			    identifierToAdd = "(" + permission + ")";
 			}
 			else if(recipientID != null)
 			{

@@ -391,9 +391,10 @@ public class Claim
 		while(iterator.hasNext())
 		{
 			String identifier = iterator.next();
-			if(playerID.equalsIgnoreCase(identifier) && this.playerIDToClaimPermissionMap.get(identifier) == level) return true;
+			if((playerID.equalsIgnoreCase(identifier) || player.getName().equalsIgnoreCase(identifier)) &&
+					this.playerIDToClaimPermissionMap.get(identifier) == level) return true;
 			
-			else if(identifier.startsWith("[") && identifier.endsWith("]"))
+			else if(identifier.startsWith("(") && identifier.endsWith(")"))
 			{
 				//drop the brackets
 				String permissionIdentifier = identifier.substring(1, identifier.length() - 1);
@@ -540,7 +541,7 @@ public class Claim
 			String managerID = this.managers.get(i);
 			if(player.getUniqueId().toString().equals(managerID)) return null;
 			
-			else if(managerID.startsWith("[") && managerID.endsWith("]"))
+			else if(managerID.startsWith("(") && managerID.endsWith(")"))
 			{
 				managerID = managerID.substring(1, managerID.length() - 1);
 				if(managerID == null || managerID.isEmpty()) continue;

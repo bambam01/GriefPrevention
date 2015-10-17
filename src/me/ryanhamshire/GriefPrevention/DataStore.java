@@ -1432,7 +1432,7 @@ public abstract class DataStore
 	    for(String name : names)
 	    {
 	        //skip non-player-names (groups and "public"), leave them as-is
-	        if(name.startsWith("[") || name.equals("public"))
+	        if(name.startsWith("(") || name.equals("public"))
             {
 	            resultNames.add(name);
 	            continue;
