@@ -71,7 +71,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.metadata.MetadataValue;
 import org.bukkit.util.BlockIterator;
 
-class PlayerEventHandler implements Listener 
+public class PlayerEventHandler implements Listener
 {
 	private DataStore dataStore;
 	
@@ -1428,7 +1428,7 @@ class PlayerEventHandler implements Listener
 	}
 	
 	//when a player interacts with the world
-	@EventHandler(priority = EventPriority.LOWEST)
+	@EventHandler(priority = EventPriority.NORMAL)
 	void onPlayerInteract(PlayerInteractEvent event)
 	{
 	    //not interested in left-click-on-air actions
@@ -1819,6 +1819,12 @@ class PlayerEventHandler implements Listener
 			
 			//if it's a golden shovel
 			else if(materialInHand != GriefPrevention.instance.config_claims_modificationTool) return;
+
+			//if denyClaiming contains the player, don't do anything
+			if(GriefPrevention.denyClaiming.contains(event.getPlayer().getUniqueId())) {
+				GriefPrevention.denyClaiming.remove(event.getPlayer().getUniqueId());
+				return;
+			}
 			
 			//disable golden shovel while under siege
 			if(playerData == null) playerData = this.dataStore.getPlayerData(player.getUniqueId());
@@ -2507,7 +2513,7 @@ class PlayerEventHandler implements Listener
         }
     }
 
-    static Block getTargetBlock(Player player, int maxDistance) throws IllegalStateException
+    public static Block getTargetBlock(Player player, int maxDistance) throws IllegalStateException
 	{
 	    BlockIterator iterator = new BlockIterator(player.getLocation(), player.getEyeHeight(), maxDistance);
 	    Block result = player.getLocation().getBlock().getRelative(BlockFace.UP);

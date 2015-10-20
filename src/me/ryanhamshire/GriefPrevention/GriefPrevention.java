@@ -57,6 +57,9 @@ public class GriefPrevention extends JavaPlugin
 	
 	//for logging to the console and log file
 	private static Logger log = Logger.getLogger("Minecraft");
+
+	//variable of players to deny claiming once
+	public static List<UUID> denyClaiming = new ArrayList<UUID>();
 	
 	//this handles data storage, like player and region data
 	public DataStore dataStore;

@@ -635,7 +635,7 @@ public abstract class DataStore
 	}
 	
 	//gets an almost-unique, persistent identifier string for a chunk
-	String getChunkString(Location location)
+	public static String getChunkString(Location location)
 	{
         return String.valueOf(location.getBlockX() >> 4) + (location.getBlockZ() >> 4);
     }
