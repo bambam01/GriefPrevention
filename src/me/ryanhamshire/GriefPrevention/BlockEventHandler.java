@@ -18,6 +18,10 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -32,17 +36,24 @@ import org.bukkit.entity.minecart.HopperMinecart;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.*;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockDispenseEvent;
+import org.bukkit.event.block.BlockFromToEvent;
+import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockIgniteEvent.IgniteCause;
+import org.bukkit.event.block.BlockMultiPlaceEvent;
+import org.bukkit.event.block.BlockPistonExtendEvent;
+import org.bukkit.event.block.BlockPistonRetractEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.BlockSpreadEvent;
+import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.inventory.InventoryPickupItemEvent;
 import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.Dispenser;
 import org.bukkit.metadata.MetadataValue;
-
-import java.util.ArrayList;
-import java.util.List;
 
 //event handlers related to blocks
 public class BlockEventHandler implements Listener 
@@ -121,15 +132,15 @@ public class BlockEventHandler implements Listener
 		PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 		if(notEmpty && playerData.lastMessage != null && !playerData.lastMessage.equals(signMessage))
 		{		
-			GriefPrevention.AddLogEntry(lines.toString().replace("\n  ", ";"), null);
+			GriefPrevention.AddLogEntry(player.getName() + lines.toString().replace("\n  ", ";"), null);
 			PlayerEventHandler.makeSocialLogEntry(player.getName(), signMessage);
 			playerData.lastMessage = signMessage;
 			
-			if(!player.hasPermission("griefprevention.eavesdrop"))
+			if(!player.hasPermission("griefprevention.eavesdropsigns"))
 			{
 				for(Player otherPlayer : GriefPrevention.instance.getServer().getOnlinePlayers())
 				{
-					if(otherPlayer.hasPermission("griefprevention.eavesdrop"))
+					if(otherPlayer.hasPermission("griefprevention.eavesdropsigns"))
 					{
 						otherPlayer.sendMessage(ChatColor.GRAY + player.getName() + signMessage);
 					}
@@ -170,7 +181,7 @@ public class BlockEventHandler implements Listener
 		//FEATURE: limit fire placement, to prevent PvP-by-fire
 		
 		//if placed block is fire and pvp is off, apply rules for proximity to other players 
-		if(block.getType() == Material.FIRE && !GriefPrevention.instance.config_pvp_enabledWorlds.contains(block.getWorld()) && !player.hasPermission("griefprevention.lava"))
+		if(block.getType() == Material.FIRE && !GriefPrevention.instance.pvpRulesApply(block.getWorld()) && !player.hasPermission("griefprevention.lava"))
 		{
 			List<Player> players = block.getWorld().getPlayers();
 			for(int i = 0; i < players.size(); i++)
@@ -488,18 +499,16 @@ public class BlockEventHandler implements Listener
     		        event.setCancelled(true);
     		        return;
     		    }
-				// not 1.7 compatible
-				/*
-    		    for(Block movedBlock : event.getBlocks())
-    		    {
+    		    
+        		if(event.getBlock().getType() == Material.PISTON_STICKY_BASE)
+        		{
     		        //if pulled block isn't in the same land claim, cancel the event
-        		    if(!pistonClaim.contains(movedBlock.getLocation(), false, false))
+        		    if(!pistonClaim.contains(event.getRetractLocation(), false, false))
         		    {
         		        event.setCancelled(true);
         		        return;
         		    }
     		    }
-    		    */
     		}
     		
     		//otherwise, consider ownership of both piston and block
@@ -512,13 +521,10 @@ public class BlockEventHandler implements Listener
                 if(pistonClaim != null) pistonOwnerName = pistonClaim.getOwnerName();
     		    
     		    String movingBlockOwnerName = "_";
-
-				// not 1.7 compatible
-				/*
-        		for(Block movedBlock : event.getBlocks())
+        		if(event.getBlock().getType() == Material.PISTON_STICKY_BASE)
         		{
         		    //who owns the moving block, if anyone?
-                    Claim movingBlockClaim = this.dataStore.getClaimAt(movedBlock.getLocation(), false, pistonClaim);
+                    Claim movingBlockClaim = this.dataStore.getClaimAt(event.getRetractLocation(), false, pistonClaim);
             		if(movingBlockClaim != null) movingBlockOwnerName = movingBlockClaim.getOwnerName();
             		
             		//if there are owners for the blocks, they must be the same player
@@ -528,7 +534,6 @@ public class BlockEventHandler implements Listener
             			event.setCancelled(true);
             		}
         		}
-        		*/
     		}
 		}
 		catch(NoSuchMethodError exception)

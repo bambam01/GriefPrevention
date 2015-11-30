@@ -19,6 +19,9 @@
 package me.ryanhamshire.GriefPrevention;
 
 import java.io.*;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -31,6 +34,8 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import com.google.common.io.Files;
+
 //singleton class which manages all GriefPrevention data (except for config options)
 public abstract class DataStore 
 {
@@ -42,7 +47,7 @@ public abstract class DataStore
 	
 	//in-memory cache for claim data
 	ArrayList<Claim> claims = new ArrayList<Claim>();
-	ConcurrentHashMap<String, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<String, ArrayList<Claim>>();
+	public ConcurrentHashMap<String, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<String, ArrayList<Claim>>();
 	
 	//in-memory cache for messages
 	private String [] messages;
@@ -55,7 +60,8 @@ public abstract class DataStore
 	
 	//path information, for where stuff stored on disk is well...  stored
 	protected final static String dataLayerFolderPath = "plugins" + File.separator + "GriefPreventionData";
-	final static String configFilePath = dataLayerFolderPath + File.separator + "config.yml";
+	final static String playerDataFolderPath = dataLayerFolderPath + File.separator + "PlayerData";
+    final static String configFilePath = dataLayerFolderPath + File.separator + "config.yml";
 	final static String messagesFilePath = dataLayerFolderPath + File.separator + "messages.yml";
 	final static String softMuteFilePath = dataLayerFolderPath + File.separator + "softMute.txt";
 
@@ -70,9 +76,9 @@ public abstract class DataStore
     private int currentSchemaVersion = -1;  //-1 means not determined yet
     
     //video links
-    static final String SURVIVAL_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpuser";
-    static final String CREATIVE_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpcrea";
-    static final String SUBDIVISION_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpsub";
+    static final String SURVIVAL_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpuser" + ChatColor.RESET;
+    static final String CREATIVE_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpcrea" + ChatColor.RESET;
+    static final String SUBDIVISION_VIDEO_URL = "" + ChatColor.DARK_AQUA + ChatColor.UNDERLINE + "bit.ly/mcgpsub" + ChatColor.RESET;
     
     //list of UUIDs which are soft-muted
     ConcurrentHashMap<UUID, Boolean> softMuteMap = new ConcurrentHashMap<UUID, Boolean>();
@@ -103,6 +109,13 @@ public abstract class DataStore
 	void initialize() throws Exception
 	{
 		GriefPrevention.AddLogEntry(this.claims.size() + " total claims loaded.");
+		
+		//ensure data folders exist
+        File playerDataFolder = new File(playerDataFolderPath);
+        if(!playerDataFolder.exists())
+        {
+            playerDataFolder.mkdirs();
+        }
 		
 		//load up all the messages from messages.yml
 		this.loadMessages();
@@ -207,7 +220,7 @@ public abstract class DataStore
 	    return newValue;
 	}
 	
-	boolean isSoftMuted(UUID playerID)
+	public boolean isSoftMuted(UUID playerID)
 	{
 	    Boolean mapEntry = this.softMuteMap.get(playerID);
 	    if(mapEntry == null || mapEntry == Boolean.FALSE)
@@ -353,7 +366,10 @@ public abstract class DataStore
 		//subdivisions are easy
 		if(newClaim.parent != null)
 		{
-			newClaim.parent.children.add(newClaim);
+			if(!newClaim.parent.children.contains(newClaim))
+			{
+			    newClaim.parent.children.add(newClaim);
+			}
 			newClaim.inDataStore = true;
 			if(writeToStorage)
 			{
@@ -384,7 +400,6 @@ public abstract class DataStore
 		{
 			PlayerData ownerData = this.getPlayerData(newClaim.ownerID);
 			ownerData.getClaims().add(newClaim);
-			this.savePlayerData(newClaim.ownerID, ownerData);
 		}
 		
 		//make sure the claim is saved to disk
@@ -620,7 +635,7 @@ public abstract class DataStore
 	}
 	
 	//gets an almost-unique, persistent identifier string for a chunk
-	String getChunkString(Location location)
+	public static String getChunkString(Location location)
 	{
         return String.valueOf(location.getBlockX() >> 4) + (location.getBlockZ() >> 4);
     }
@@ -756,7 +771,47 @@ public abstract class DataStore
 	    new SavePlayerDataThread(playerID, playerData).start();
 	}
 	
-	public abstract void asyncSavePlayerData(UUID playerID, PlayerData playerData);
+	public void asyncSavePlayerData(UUID playerID, PlayerData playerData)
+	{
+	    //save everything except the ignore list
+	    this.overrideSavePlayerData(playerID, playerData);
+	    
+	    //save the ignore list
+	    if(playerData.ignoreListChanged)
+	    {
+    	    StringBuilder fileContent = new StringBuilder();
+            try
+            {
+                for(UUID uuidKey : playerData.ignoredPlayers.keySet())
+                {
+                    Boolean value = playerData.ignoredPlayers.get(uuidKey);
+                    if(value == null) continue;
+                    
+                    //admin-enforced ignores begin with an asterisk
+                    if(value)
+                    {
+                        fileContent.append("*");
+                    }
+                    
+                    fileContent.append(uuidKey);
+                    fileContent.append("\n");
+                }
+                
+                //write data to file
+                File playerDataFile = new File(playerDataFolderPath + File.separator + playerID + ".ignore");
+                Files.write(fileContent.toString().trim().getBytes("UTF-8"), playerDataFile);
+            }  
+            
+            //if any problem, log it
+            catch(Exception e)
+            {
+                GriefPrevention.AddLogEntry("GriefPrevention: Unexpected exception saving data for player \"" + playerID.toString() + "\": " + e.getMessage());
+                e.printStackTrace();
+            }
+	    }
+	}
+	
+	abstract void overrideSavePlayerData(UUID playerID, PlayerData playerData);
 	
 	//extends a claim to a new depth
 	//respects the max depth config variable
@@ -1194,7 +1249,7 @@ public abstract class DataStore
 		this.addDefault(defaults, Messages.SiegeNoShovel, "You can't use your shovel tool while involved in a siege.", null);
 		this.addDefault(defaults, Messages.RestoreNaturePlayerInChunk, "Unable to restore.  {0} is in that chunk.", "0: nearby player");
 		this.addDefault(defaults, Messages.NoCreateClaimPermission, "You don't have permission to claim land.", null);
-		this.addDefault(defaults, Messages.ResizeClaimTooSmall, "This new size would be too small.  Claims must be at least {0} x {0}.", "0: minimum claim size");
+		this.addDefault(defaults, Messages.ResizeClaimTooNarrow, "This new size would be too small.  Claims must be at least {0} blocks wide.", "0: minimum claim width");
 		this.addDefault(defaults, Messages.ResizeNeedMoreBlocks, "You don't have enough blocks for this size.  You need {0} more.", "0: how many needed");
 		this.addDefault(defaults, Messages.ClaimResizeSuccess, "Claim resized.  {0} available claim blocks remaining.", "0: remaining blocks");
 		this.addDefault(defaults, Messages.ResizeFailOverlap, "Can't resize here because it would overlap another nearby claim.", null);
@@ -1207,7 +1262,8 @@ public abstract class DataStore
 		this.addDefault(defaults, Messages.CreateClaimFailOverlapOtherPlayer, "You can't create a claim here because it would overlap {0}'s claim.", "0: other claim owner");
 		this.addDefault(defaults, Messages.ClaimsDisabledWorld, "Land claims are disabled in this world.", null);
 		this.addDefault(defaults, Messages.ClaimStart, "Claim corner set!  Use the shovel again at the opposite corner to claim a rectangle of land.  To cancel, put your shovel away.", null);
-		this.addDefault(defaults, Messages.NewClaimTooSmall, "This claim would be too small.  Any claim must be at least {0} x {0}.", "0: minimum claim size");
+		this.addDefault(defaults, Messages.NewClaimTooNarrow, "This claim would be too small.  Any claim must be at least {0} blocks wide.", "0: minimum claim width");
+		this.addDefault(defaults, Messages.ResizeClaimInsufficientArea, "This claim would be too small.  Any claim must use at least {0} total claim blocks.", "0: minimum claim area");
 		this.addDefault(defaults, Messages.CreateClaimInsufficientBlocks, "You don't have enough blocks to claim that entire area.  You need {0} more blocks.", "0: additional blocks needed");
 		this.addDefault(defaults, Messages.AbandonClaimAdvertisement, "To delete another claim and free up some blocks, use /AbandonClaim.", null);
 		this.addDefault(defaults, Messages.CreateClaimFailOverlapShort, "Your selected area overlaps an existing claim.", null);
@@ -1233,7 +1289,6 @@ public abstract class DataStore
 		this.addDefault(defaults, Messages.AutoBanNotify, "Auto-banned {0}({1}).  See logs for details.", null);
 		this.addDefault(defaults, Messages.AdjustGroupBlocksSuccess, "Adjusted bonus claim blocks for players with the {0} permission by {1}.  New total: {2}.", "0: permission; 1: adjustment amount; 2: new total bonus");
 		this.addDefault(defaults, Messages.InvalidPermissionID, "Please specify a player name, or a permission in [brackets].", null);
-		this.addDefault(defaults, Messages.UntrustOwnerOnly, "Only {0} can revoke permissions here.", "0: claim owner's name");
 		this.addDefault(defaults, Messages.HowToClaimRegex, "(^|.*\\W)how\\W.*\\W(claim|protect|lock)(\\W.*|$)", "This is a Java Regular Expression.  Look it up before editing!  It's used to tell players about the demo video when they ask how to claim land.");
 		this.addDefault(defaults, Messages.NoBuildOutsideClaims, "You can't build here unless you claim some land first.", null);
 		this.addDefault(defaults, Messages.PlayerOfflineTime, "  Last login: {0} days ago.", "0: number of full days since last login");
@@ -1275,6 +1330,32 @@ public abstract class DataStore
 		this.addDefault(defaults, Messages.NoChatUntilMove, "Sorry, but you have to move a little more before you can chat.  We get lots of spam bots here.  :)", null);
 		this.addDefault(defaults, Messages.SiegeImmune, "That player is immune to /siege.", null);
 		this.addDefault(defaults, Messages.SetClaimBlocksSuccess, "Updated accrued claim blocks.", null);
+		this.addDefault(defaults, Messages.IgnoreConfirmation, "You're now ignoring chat messages from that player.", null);
+		this.addDefault(defaults, Messages.UnIgnoreConfirmation, "You're no longer ignoring chat messages from that player.", null);
+		this.addDefault(defaults, Messages.NotIgnoringPlayer, "You're not ignoring that player.", null);
+		this.addDefault(defaults, Messages.SeparateConfirmation, "Those players will now ignore each other in chat.", null);
+		this.addDefault(defaults, Messages.UnSeparateConfirmation, "Those players will no longer ignore each other in chat.", null);
+        this.addDefault(defaults, Messages.NotIgnoringAnyone, "You're not ignoring anyone.", null);
+		this.addDefault(defaults, Messages.TrustListHeader, "Explicit permissions here:", null);
+		this.addDefault(defaults, Messages.Manage, "Manage", null);
+		this.addDefault(defaults, Messages.Build, "Build", null);
+		this.addDefault(defaults, Messages.Containers, "Containers", null);
+		this.addDefault(defaults, Messages.Access, "Access", null);
+		this.addDefault(defaults, Messages.StartBlockMath, "{0} blocks from play + {1} bonus = {2} total.", null);
+		this.addDefault(defaults, Messages.ClaimsListHeader, "Claims:", null);
+		this.addDefault(defaults, Messages.ContinueBlockMath, " (-{0} blocks)", null);
+		this.addDefault(defaults, Messages.EndBlockMath, " = {0} blocks left to spend", null);
+		this.addDefault(defaults, Messages.NoClaimDuringPvP, "You can't claim lands during PvP combat.", null);
+		this.addDefault(defaults, Messages.UntrustAllOwnerOnly, "Only the claim owner can clear all its permissions.", null);
+		this.addDefault(defaults, Messages.ManagersDontUntrustManagers, "Only the claim owner can demote a manager.", null);
+		
+		this.addDefault(defaults, Messages.BookAuthor, "BigScary", null);
+		this.addDefault(defaults, Messages.BookTitle, "How to Claim Land", null);
+		this.addDefault(defaults, Messages.BookLink, "Click: {0}", "{0}: video URL");
+		this.addDefault(defaults, Messages.BookIntro, "Claim land to protect your stuff!  Click the link above to learn land claims in 3 minutes or less.  :)", null);
+		this.addDefault(defaults, Messages.BookTools, "Our claim tools are {0} and {1}.", "0: claim modification tool name; 1:claim information tool name");
+		this.addDefault(defaults, Messages.BookDisabledChestClaims, "  On this server, placing a chest will NOT claim land for you.", null);
+		this.addDefault(defaults, Messages.BookUsefulCommands, "Useful Commands:", null);
 		
 		//load the config file
 		FileConfiguration config = YamlConfiguration.loadConfiguration(new File(messagesFilePath));
@@ -1351,7 +1432,7 @@ public abstract class DataStore
 	    for(String name : names)
 	    {
 	        //skip non-player-names (groups and "public"), leave them as-is
-	        if(name.startsWith("[") || name.equals("public"))
+	        if(name.startsWith("(") || name.equals("public") || TrustableFakePlayers.isTrustableFakePlayer(name))
             {
 	            resultNames.add(name);
 	            continue;

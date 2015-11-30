@@ -361,6 +361,16 @@ public class Claim
 		ClaimPermission permissionLevel = this.playerIDToClaimPermissionMap.get("public");
 		if(ClaimPermission.Build == permissionLevel) return null;
 		
+		//allow for farming with /containertrust permission
+        if(this.allowContainers(player) == null)
+        {
+            //do allow for farming, if player has /containertrust permission
+            if(this.placeableForFarming(material))
+            {
+                return null;
+            }
+        }
+		
 		//subdivision permission inheritance
 		if(this.parent != null)
 			return this.parent.allowBuild(player, material);
@@ -370,17 +380,7 @@ public class Claim
 		if(player.hasPermission("griefprevention.ignoreclaims"))
 				reason += "  " + GriefPrevention.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
 		
-		//allow for farming with /containertrust permission
-		if(reason != null && this.allowContainers(player) == null)
-        {
-            //do allow for farming, if player has /containertrust permission
-            if(this.placeableForFarming(material))
-            {
-                return null;
-            }
-        }
-        
-        return reason;
+		return reason;
 	}
 	
 	private boolean hasExplicitPermission(Player player, ClaimPermission level)
@@ -391,9 +391,10 @@ public class Claim
 		while(iterator.hasNext())
 		{
 			String identifier = iterator.next();
-			if(playerID.equalsIgnoreCase(identifier) && this.playerIDToClaimPermissionMap.get(identifier) == level) return true;
+			if((playerID.equalsIgnoreCase(identifier) || player.getName().equalsIgnoreCase(identifier)) &&
+					this.playerIDToClaimPermissionMap.get(identifier) == level) return true;
 			
-			else if(identifier.startsWith("[") && identifier.endsWith("]"))
+			else if(identifier.startsWith("(") && identifier.endsWith(")"))
 			{
 				//drop the brackets
 				String permissionIdentifier = identifier.substring(1, identifier.length() - 1);
@@ -540,7 +541,7 @@ public class Claim
 			String managerID = this.managers.get(i);
 			if(player.getUniqueId().toString().equals(managerID)) return null;
 			
-			else if(managerID.startsWith("[") && managerID.endsWith("]"))
+			else if(managerID.startsWith("(") && managerID.endsWith(")"))
 			{
 				managerID = managerID.substring(1, managerID.length() - 1);
 				if(managerID == null || managerID.isEmpty()) continue;
@@ -580,6 +581,7 @@ public class Claim
 	public void clearPermissions()
 	{
 		this.playerIDToClaimPermissionMap.clear();
+		this.managers.clear();
 		
 		for(Claim child : this.children)
         {

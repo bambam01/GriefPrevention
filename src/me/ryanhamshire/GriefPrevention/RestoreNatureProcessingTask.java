@@ -18,13 +18,13 @@
  
 package me.ryanhamshire.GriefPrevention;
 
+import java.util.ArrayList;
+
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World.Environment;
 import org.bukkit.block.Biome;
 import org.bukkit.entity.Player;
-
-import java.util.ArrayList;
 
 //non-main-thread task which processes world data to repair the unnatural
 //after processing is complete, creates a main thread task to make the necessary changes to the world
@@ -100,6 +100,7 @@ class RestoreNatureProcessingTask implements Runnable
 		{
 			this.playerBlocks.add(Material.LEAVES.getId());
 			this.playerBlocks.add(Material.LOG.getId());
+			this.playerBlocks.add(Material.LOG_2.getId());
 			this.playerBlocks.add(Material.VINE.getId());
 		}
 	}
@@ -136,12 +137,6 @@ class RestoreNatureProcessingTask implements Runnable
 		//remove water/lava above sea level
 		this.removeDumpedFluids();
 		
-		//cover over any gaping holes in creative mode worlds
-		if(this.creativeMode && this.environment == Environment.NORMAL)
-		{
-			this.fillBigHoles();
-		}
-		
 		//cover surface stone and gravel with sand or grass, as the biome requires
 		this.coverSurfaceStone();
 		
@@ -174,29 +169,6 @@ class RestoreNatureProcessingTask implements Runnable
 		}		
 	}
 
-	private void fillBigHoles()
-	{
-		if(this.seaLevel < 3) return;
-	    
-	    for(int x = 1; x < snapshots.length - 1; x++)
-		{
-			for(int z = 1; z < snapshots[0][0].length - 1; z++)
-			{
-				//replace air, lava, or running water at sea level with stone
-				if(this.snapshots[x][this.seaLevel - 2][z].typeId == Material.AIR.getId() || this.snapshots[x][this.seaLevel - 2][z].typeId == Material.LAVA.getId() || (this.snapshots[x][this.seaLevel - 2][z].typeId == Material.WATER.getId() || this.snapshots[x][this.seaLevel - 2][z].data != 0))
-				{
-					this.snapshots[x][this.seaLevel - 2][z].typeId = Material.STONE.getId();
-				}
-				
-				//do the same for one layer beneath that (because a future restoration step may convert surface stone to sand, which falls down)
-				if(this.snapshots[x][this.seaLevel - 3][z].typeId == Material.AIR.getId() || this.snapshots[x][this.seaLevel - 3][z].typeId == Material.LAVA.getId() || (this.snapshots[x][this.seaLevel - 3][z].typeId == Material.WATER.getId() || this.snapshots[x][this.seaLevel - 3][z].data != 0))
-				{
-					this.snapshots[x][this.seaLevel - 3][z].typeId = Material.STONE.getId();
-				}
-			}
-		}
-	}
-	
 	//converts sandstone adjacent to sand to sand, and any other sandstone to air
 	private void removeSandstone()
 	{
@@ -301,6 +273,7 @@ class RestoreNatureProcessingTask implements Runnable
 					
 					//skip non-logs
 					if(block.typeId != Material.LOG.getId()) continue;
+					if(block.typeId != Material.LOG_2.getId()) continue;
 					
 					//if in jungle biome, skip jungle logs
 					if(jungleBiome && block.data == 3) continue;
@@ -459,6 +432,8 @@ class RestoreNatureProcessingTask implements Runnable
 		notSuitableForFillBlocks.add(Material.CACTUS.getId());
 		notSuitableForFillBlocks.add(Material.STATIONARY_WATER.getId());
 		notSuitableForFillBlocks.add(Material.STATIONARY_LAVA.getId());
+		notSuitableForFillBlocks.add(Material.LOG.getId());
+		notSuitableForFillBlocks.add(Material.LOG_2.getId());
 		
 		boolean changed;
 		do
@@ -753,6 +728,7 @@ class RestoreNatureProcessingTask implements Runnable
 		{
 			playerBlocks.add(Material.LEAVES.getId());
 			playerBlocks.add(Material.LOG.getId());
+			playerBlocks.add(Material.LOG_2.getId());
 		}
 		
 		return playerBlocks;

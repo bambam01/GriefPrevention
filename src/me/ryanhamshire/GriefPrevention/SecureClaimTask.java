@@ -18,6 +18,8 @@
  
  package me.ryanhamshire.GriefPrevention;
 
+import java.util.Collection;
+
 import org.bukkit.entity.Player;
 
 //secures a claim after a siege looting window has closed
