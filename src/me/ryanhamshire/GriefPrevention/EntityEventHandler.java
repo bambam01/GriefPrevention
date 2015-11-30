@@ -349,7 +349,7 @@ class EntityEventHandler implements Listener
 		if(!(entity instanceof Player)) return;  //only tracking players
 		
 		Player player = (Player)entity;
-		PlayerData playerData = this.dataStore.getPlayerData(player);
+		PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
 		
 		//if involved in a siege
 		if(playerData.siegeData != null)
@@ -471,7 +471,7 @@ class EntityEventHandler implements Listener
 		//otherwise, apply entity-count limitations for creative worlds
 		else if(GriefPrevention.instance.creativeRulesApply(event.getEntity().getLocation()))
 		{
-			PlayerData playerData = this.dataStore.getPlayerData(event.getPlayer());
+			PlayerData playerData = this.dataStore.getPlayerData(event.getPlayer().getUniqueId());
 			Claim claim = this.dataStore.getClaimAt(event.getBlock().getLocation(), false, playerData.lastClaim);
 			if(claim == null) return;
 			
@@ -555,8 +555,8 @@ class EntityEventHandler implements Listener
 			
 			if(attacker != defender)
 			{
-    			PlayerData defenderData = this.dataStore.getPlayerData((Player)event.getEntity());
-    			PlayerData attackerData = this.dataStore.getPlayerData(attacker);
+    			PlayerData defenderData = this.dataStore.getPlayerData(((Player)event.getEntity()).getUniqueId());
+    			PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
     			
     			//otherwise if protecting spawning players
     			if(GriefPrevention.instance.config_pvp_protectFreshSpawns)
@@ -625,7 +625,7 @@ class EntityEventHandler implements Listener
                 PlayerData playerData = null;
                 if(attacker != null)
                 {
-                    playerData = this.dataStore.getPlayerData(attacker);
+                    playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
                     cachedClaim = playerData.lastClaim;
                 }
                 
@@ -676,7 +676,7 @@ class EntityEventHandler implements Listener
     		                if(attacker.getUniqueId().equals(ownerID)) return;
     		                
     		                //allow for admin override
-    		                PlayerData attackerData = this.dataStore.getPlayerData(attacker);
+    		                PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
     		                if(attackerData.ignoreClaims) return;
     		               
     		                //otherwise disallow in non-pvp worlds
@@ -714,7 +714,7 @@ class EntityEventHandler implements Listener
 				
 				if(attacker != null)
 				{
-					playerData = this.dataStore.getPlayerData(attacker);
+					playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
 					cachedClaim = playerData.lastClaim;
 				}
 				
@@ -816,8 +816,8 @@ class EntityEventHandler implements Listener
         //if attacker not a player, do nothing
         if(attacker == null) return;
         
-        PlayerData defenderData = this.dataStore.getPlayerData(defender);
-        PlayerData attackerData = this.dataStore.getPlayerData(attacker);
+        PlayerData defenderData = this.dataStore.getPlayerData(defender.getUniqueId());
+        PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
         
         if(attacker != defender)
         {
@@ -879,7 +879,7 @@ class EntityEventHandler implements Listener
 		
 		if(attacker != null)
 		{
-			playerData = this.dataStore.getPlayerData(attacker);
+			playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
 			cachedClaim = playerData.lastClaim;
 		}
 		
@@ -971,8 +971,8 @@ class EntityEventHandler implements Listener
 	            else if(GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims || GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims)
 	            {
 	                Player effectedPlayer = (Player)effected;
-	                PlayerData defenderData = this.dataStore.getPlayerData(effectedPlayer);
-	                PlayerData attackerData = this.dataStore.getPlayerData(thrower);
+	                PlayerData defenderData = this.dataStore.getPlayerData(effectedPlayer.getUniqueId());
+	                PlayerData attackerData = this.dataStore.getPlayerData(thrower.getUniqueId());
 	                Claim attackerClaim = this.dataStore.getClaimAt(thrower.getLocation(), false, attackerData.lastClaim);
 	                if( attackerClaim != null && 
 	                    (attackerClaim.isAdminClaim() && attackerClaim.parent == null && GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims ||
