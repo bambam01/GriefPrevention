@@ -885,7 +885,7 @@ public class Claim
 		{
 		    for(int z = smallZ; z <= largeZ; z++)
 		    {
-		        chunkStrings.add(String.valueOf(x) + z);
+		        chunkStrings.add(x + "," + z);
 		    }
 		}
 		

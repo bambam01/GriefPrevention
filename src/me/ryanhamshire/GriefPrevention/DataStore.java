@@ -634,10 +634,10 @@ public abstract class DataStore
 	    return Collections.unmodifiableCollection(this.claims);
 	}
 	
-	//gets an almost-unique, persistent identifier string for a chunk
+	//gets an unique, persistent identifier string for a chunk
 	public static String getChunkString(Location location)
 	{
-        return String.valueOf(location.getBlockX() >> 4) + (location.getBlockZ() >> 4);
+        return String.valueOf(location.getBlockX() >> 4) + "," + String.valueOf(location.getBlockZ() >> 4);
     }
 	
     //creates a claim.
