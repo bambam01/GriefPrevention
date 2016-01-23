@@ -18,23 +18,18 @@
 
 package me.ryanhamshire.GriefPrevention;
 
-import java.io.*;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
-
+import com.google.common.io.Files;
 import me.ryanhamshire.GriefPrevention.events.ClaimDeletedEvent;
-
 import org.bukkit.*;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import com.google.common.io.Files;
+import java.io.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 //singleton class which manages all GriefPrevention data (except for config options)
 public abstract class DataStore 
@@ -47,7 +42,7 @@ public abstract class DataStore
 	
 	//in-memory cache for claim data
 	ArrayList<Claim> claims = new ArrayList<Claim>();
-	public ConcurrentHashMap<String, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<String, ArrayList<Claim>>();
+	public ConcurrentHashMap<Long, ArrayList<Claim>> chunksToClaimsMap = new ConcurrentHashMap<Long, ArrayList<Claim>>();
 	
 	//in-memory cache for messages
 	private String [] messages;
@@ -223,13 +218,9 @@ public abstract class DataStore
 	public boolean isSoftMuted(UUID playerID)
 	{
 	    Boolean mapEntry = this.softMuteMap.get(playerID);
-	    if(mapEntry == null || mapEntry == Boolean.FALSE)
-	    {
-	        return false;
-	    }
-	    
-	    return true;
-	}
+        return !(mapEntry == null || mapEntry == Boolean.FALSE);
+
+    }
 	
 	private void saveSoftMutes()
 	{
@@ -380,14 +371,14 @@ public abstract class DataStore
 		
 		//add it and mark it as added
 		this.claims.add(newClaim);
-		ArrayList<String> chunkStrings = newClaim.getChunkStrings();
-		for(String chunkString : chunkStrings)
+		ArrayList<Long> chunkIdentifiers = newClaim.getChunkIdentifiers();
+		for(long chunkIdentifier : chunkIdentifiers)
 		{
-		    ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.get(chunkString);
+		    ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.get(chunkIdentifier);
 		    if(claimsInChunk == null)
 		    {
 		        claimsInChunk = new ArrayList<Claim>();
-		        this.chunksToClaimsMap.put(chunkString, claimsInChunk);
+		        this.chunksToClaimsMap.put(chunkIdentifier, claimsInChunk);
 		    }
 		    
 		    claimsInChunk.add(newClaim);
@@ -541,10 +532,10 @@ public abstract class DataStore
 			}
 		}
 		
-		ArrayList<String> chunkStrings = claim.getChunkStrings();
-        for(String chunkString : chunkStrings)
+		ArrayList<Long> chunkIdentifiers = claim.getChunkIdentifiers();
+        for(long chunkIdentifier : chunkIdentifiers)
         {
-            ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.get(chunkString);
+            ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.get(chunkIdentifier);
             for(int j = 0; j < claimsInChunk.size(); j++)
             {
                 if(claimsInChunk.get(j).id.equals(claim.id))
@@ -591,7 +582,7 @@ public abstract class DataStore
 		if(cachedClaim != null && cachedClaim.inDataStore && cachedClaim.contains(location, ignoreHeight, true)) return cachedClaim;
 		
 		//find a top level claim
-		String chunkID = this.getChunkString(location);
+		long chunkID = getChunkIdentifier(location);
 		ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.get(chunkID);
 		if(claimsInChunk == null) return null;
 		
@@ -635,9 +626,11 @@ public abstract class DataStore
 	}
 	
 	//gets an unique, persistent identifier string for a chunk
-	public static String getChunkString(Location location)
+	public static long getChunkIdentifier(Location location)
 	{
-        return String.valueOf(location.getBlockX() >> 4) + "," + String.valueOf(location.getBlockZ() >> 4);
+		int x = location.getBlockX() >> 4;
+		int z = location.getBlockZ() >> 4;
+        return (long)x << 32 | z & 0xFFFFFFFFL;
     }
 	
     //creates a claim.
@@ -1498,7 +1491,7 @@ public abstract class DataStore
             for(int chunk_z = lesserChunk.getZ(); chunk_z <= greaterChunk.getZ(); chunk_z++)
             {
                 Chunk chunk = location.getWorld().getChunkAt(chunk_x, chunk_z);
-                String chunkID = this.getChunkString(chunk.getBlock(0,  0,  0).getLocation());
+                long chunkID = getChunkIdentifier(chunk.getBlock(0,  0,  0).getLocation());
                 ArrayList<Claim> claimsInChunk = this.chunksToClaimsMap.get(chunkID);
                 if(claimsInChunk != null)
                 {
