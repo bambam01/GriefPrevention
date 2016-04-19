@@ -18,8 +18,7 @@
  
  package me.ryanhamshire.GriefPrevention;
 
-import java.util.Collection;
-
+import net.kaikk.mc.uuidprovider.UUIDProvider;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
@@ -55,7 +54,7 @@ class DeliverClaimBlocksTask implements Runnable
 	    else
 	    {
 	        DataStore dataStore = GriefPrevention.instance.dataStore;
-            PlayerData playerData = dataStore.getPlayerData(player.getUniqueId());
+            PlayerData playerData = dataStore.getPlayerData(UUIDProvider.retrieve(player.getName()));
             
             Location lastLocation = playerData.lastAfkCheckLocation;
             try

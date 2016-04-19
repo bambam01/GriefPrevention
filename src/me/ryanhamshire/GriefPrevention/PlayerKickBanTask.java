@@ -18,9 +18,6 @@
  
 package me.ryanhamshire.GriefPrevention;
 
-import org.bukkit.BanList;
-import org.bukkit.Bukkit;
-import org.bukkit.BanList.Type;
 import org.bukkit.entity.Player;
 
 //kicks or bans a player
@@ -54,8 +51,7 @@ class PlayerKickBanTask implements Runnable
 		if(this.ban)
 		{		
 			//ban
-			BanList bans = Bukkit.getServer().getBanList(Type.NAME);
-			bans.addBan(this.player.getName(), this.reason, null, source);
+			this.player.setBanned(true);
 		
 			//kick
 			if(this.player.isOnline())

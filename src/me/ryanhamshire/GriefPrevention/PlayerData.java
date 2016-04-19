@@ -17,24 +17,16 @@
  */
 
 package me.ryanhamshire.GriefPrevention;
+import net.kaikk.mc.uuidprovider.UUIDProvider;
+import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
+
 import java.net.InetAddress;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
-import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
-
-import me.ryanhamshire.GriefPrevention.Claim;
-import me.ryanhamshire.GriefPrevention.GriefPrevention;
-import me.ryanhamshire.GriefPrevention.ShovelMode;
-import me.ryanhamshire.GriefPrevention.SiegeData;
-import me.ryanhamshire.GriefPrevention.Visualization;
-
-import org.bukkit.Location;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
 
 //holds all of GriefPrevention's player-tied data
 public class PlayerData 
@@ -312,7 +304,7 @@ public class PlayerData
             int totalBlocks = this.accruedClaimBlocks + this.getBonusClaimBlocks() + GriefPrevention.instance.dataStore.getGroupBonusBlocks(this.playerID);
             if(totalBlocks < totalClaimsArea)
             {
-                OfflinePlayer player = GriefPrevention.instance.getServer().getOfflinePlayer(this.playerID);
+                OfflinePlayer player = GriefPrevention.instance.getServer().getOfflinePlayer(UUIDProvider.retrieve(this.playerID));
                 GriefPrevention.AddLogEntry(player.getName() + " has more claimed land than blocks available.  Adding blocks to fix.", CustomLogEntryTypes.Debug, true);
                 GriefPrevention.AddLogEntry("Total blocks: " + totalBlocks + " Total claimed area: " + totalClaimsArea, CustomLogEntryTypes.Debug, true);
                 for(Claim claim : this.claims)

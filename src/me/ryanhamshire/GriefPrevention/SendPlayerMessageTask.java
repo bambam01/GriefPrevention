@@ -18,6 +18,7 @@
  
 package me.ryanhamshire.GriefPrevention;
 
+import net.kaikk.mc.uuidprovider.UUIDProvider;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
@@ -48,7 +49,7 @@ class SendPlayerMessageTask implements Runnable
 	    //if the player is dead, save it for after his respawn
 	    if(this.player.isDead())
 	    {
-	        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(this.player.getUniqueId());
+	        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(UUIDProvider.retrieve(this.player.getName()));
 	        playerData.messageOnRespawn = this.color + this.message;
 	    }
 	    

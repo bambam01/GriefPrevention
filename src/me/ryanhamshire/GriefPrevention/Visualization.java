@@ -18,14 +18,15 @@
 
 package me.ryanhamshire.GriefPrevention;
 
-import java.util.ArrayList;
-
+import net.kaikk.mc.uuidprovider.UUIDProvider;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
+
+import java.util.ArrayList;
 
 //represents a visualization sent to a player
 //FEATURE: to show players visually where claim boundaries are, we send them fake block change packets
@@ -37,7 +38,7 @@ public class Visualization
 	//sends a visualization to a player
 	public static void Apply(Player player, Visualization visualization)
 	{
-		PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+		PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(UUIDProvider.retrieve(player.getName()));
 		
 		//if he has any current visualization, clear it first
 		if(playerData.currentVisualization != null)
@@ -57,7 +58,7 @@ public class Visualization
 	{
 	    if(!player.isOnline()) return;
 	    
-	    PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+	    PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(UUIDProvider.retrieve(player.getName()));
 		
 		Visualization visualization = playerData.currentVisualization;
 		

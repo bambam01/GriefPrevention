@@ -3,6 +3,7 @@
 package me.ryanhamshire.GriefPrevention;
 
 import com.google.common.base.Charsets;
+import net.kaikk.mc.uuidprovider.UUIDProvider;
 import org.bukkit.OfflinePlayer;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -55,10 +56,11 @@ class UUIDFetcher {
         OfflinePlayer [] players = GriefPrevention.instance.getServer().getOfflinePlayers();
         for(OfflinePlayer player : players)
         {
-            if(player.getName() != null && player.getUniqueId() != null)
+
+            if(player.getName() != null && UUIDProvider.retrieve(player.getName()) != null)
             {
-                lookupCache.put(player.getName(), player.getUniqueId());
-                lookupCache.put(player.getName().toLowerCase(), player.getUniqueId());
+                lookupCache.put(player.getName(), UUIDProvider.retrieve(player.getName()));
+                lookupCache.put(player.getName().toLowerCase(), UUIDProvider.retrieve(player.getName()));
                 correctedNames.put(player.getName().toLowerCase(), player.getName());
             }
         }

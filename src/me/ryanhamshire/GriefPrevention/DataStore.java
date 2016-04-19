@@ -20,6 +20,7 @@ package me.ryanhamshire.GriefPrevention;
 
 import com.google.common.io.Files;
 import me.ryanhamshire.GriefPrevention.events.ClaimDeletedEvent;
+import net.kaikk.mc.uuidprovider.UUIDProvider;
 import org.bukkit.*;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -276,7 +277,7 @@ public abstract class DataStore
 		while(iterator.hasNext())
 		{
 			String groupName = iterator.next();
-			Player player = GriefPrevention.instance.getServer().getPlayer(playerID);
+			Player player = GriefPrevention.instance.getServer().getPlayer(UUIDProvider.retrieve(playerID));
 			if(player != null && player.hasPermission(groupName))
 			{
 				bonusBlocks += this.permissionToBonusBlocksMap.get(groupName);
@@ -843,8 +844,8 @@ public abstract class DataStore
 	{
 		//fill-in the necessary SiegeData instance
 		SiegeData siegeData = new SiegeData(attacker, defender, defenderClaim);
-		PlayerData attackerData = this.getPlayerData(attacker.getUniqueId());
-		PlayerData defenderData = this.getPlayerData(defender.getUniqueId());
+		PlayerData attackerData = this.getPlayerData(UUIDProvider.retrieve(attacker.getName()));
+		PlayerData defenderData = this.getPlayerData(UUIDProvider.retrieve(attacker.getName()));
 		attackerData.siegeData = siegeData;
 		defenderData.siegeData = siegeData;
 		defenderClaim.siegeData = siegeData;
@@ -892,10 +893,10 @@ public abstract class DataStore
 			grantAccess = true;
 		}
 		
-		PlayerData attackerData = this.getPlayerData(siegeData.attacker.getUniqueId());
+		PlayerData attackerData = this.getPlayerData(UUIDProvider.retrieve(siegeData.attacker.getName()));
 		attackerData.siegeData = null;
 		
-		PlayerData defenderData = this.getPlayerData(siegeData.defender.getUniqueId());	
+		PlayerData defenderData = this.getPlayerData(UUIDProvider.retrieve(siegeData.defender.getName()));
 		defenderData.siegeData = null;
 		defenderData.lastSiegeEndTimeStamp = System.currentTimeMillis();
 
@@ -996,7 +997,7 @@ public abstract class DataStore
 		}
 		
 		//look for genderal defender cooldown
-        PlayerData defenderData = this.getPlayerData(defender.getUniqueId());
+        PlayerData defenderData = this.getPlayerData(UUIDProvider.retrieve(defender.getName()));
 		if(defenderData.lastSiegeEndTimeStamp > 0)
         {
             long now = System.currentTimeMillis();
@@ -1026,7 +1027,7 @@ public abstract class DataStore
 	//extend a siege, if it's possible to do so
 	synchronized void tryExtendSiege(Player player, Claim claim)
 	{
-		PlayerData playerData = this.getPlayerData(player.getUniqueId());
+		PlayerData playerData = this.getPlayerData(UUIDProvider.retrieve(player.getName()));
 		
 		//player must be sieged
 		if(playerData.siegeData == null) return;

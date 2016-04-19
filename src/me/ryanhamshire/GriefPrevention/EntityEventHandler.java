@@ -18,58 +18,18 @@
 
 package me.ryanhamshire.GriefPrevention;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.UUID;
-
 import me.ryanhamshire.GriefPrevention.events.PreventPvPEvent;
-
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.World;
+import net.kaikk.mc.uuidprovider.UUIDProvider;
+import org.bukkit.*;
 import org.bukkit.World.Environment;
 import org.bukkit.block.Block;
-import org.bukkit.entity.Animals;
-import org.bukkit.entity.Creature;
-import org.bukkit.entity.Creeper;
-import org.bukkit.entity.Enderman;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Explosive;
-import org.bukkit.entity.FallingBlock;
-import org.bukkit.entity.Horse;
-import org.bukkit.entity.Item;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Monster;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Projectile;
-import org.bukkit.entity.Tameable;
-import org.bukkit.entity.ThrownPotion;
-import org.bukkit.entity.Villager;
-import org.bukkit.entity.WaterMob;
-
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.*;
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
-import org.bukkit.event.entity.EntityBreakDoorEvent;
-import org.bukkit.event.entity.EntityChangeBlockEvent;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
-import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.entity.EntityExplodeEvent;
-import org.bukkit.event.entity.EntityInteractEvent;
-import org.bukkit.event.entity.ExpBottleEvent;
-import org.bukkit.event.entity.ItemSpawnEvent;
-import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingBreakEvent;
 import org.bukkit.event.hanging.HangingBreakEvent.RemoveCause;
@@ -82,6 +42,8 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.util.Vector;
+
+import java.util.*;
 
 //handles events related to entities
 public class EntityEventHandler implements Listener
@@ -395,7 +357,7 @@ public class EntityEventHandler implements Listener
 		if(!(entity instanceof Player)) return;  //only tracking players
 		
 		Player player = (Player)entity;
-		PlayerData playerData = this.dataStore.getPlayerData(player.getUniqueId());
+		PlayerData playerData = this.dataStore.getPlayerData(UUIDProvider.retrieve(player.getName()));
 		
 		//if involved in a siege
 		if(playerData.siegeData != null)
@@ -419,7 +381,7 @@ public class EntityEventHandler implements Listener
             //remember information about these drops so that they can be marked when they spawn as items
             long expirationTime = System.currentTimeMillis() + 3000;  //now + 3 seconds
             Location deathLocation = player.getLocation();
-            UUID playerID = player.getUniqueId();
+            UUID playerID = UUIDProvider.retrieve(player.getName());
             List<ItemStack> drops = event.getDrops();
             for(ItemStack stack : drops)
             {
@@ -517,7 +479,7 @@ public class EntityEventHandler implements Listener
 		//otherwise, apply entity-count limitations for creative worlds
 		else if(GriefPrevention.instance.creativeRulesApply(event.getEntity().getLocation()))
 		{
-			PlayerData playerData = this.dataStore.getPlayerData(event.getPlayer().getUniqueId());
+			PlayerData playerData = this.dataStore.getPlayerData(UUIDProvider.retrieve(event.getPlayer().getName()));
 			Claim claim = this.dataStore.getClaimAt(event.getBlock().getLocation(), false, playerData.lastClaim);
 			if(claim == null) return;
 			
@@ -597,8 +559,8 @@ public class EntityEventHandler implements Listener
 			
 			if(attacker != defender)
 			{
-    			PlayerData defenderData = this.dataStore.getPlayerData(((Player)event.getEntity()).getUniqueId());
-    			PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+    			PlayerData defenderData = this.dataStore.getPlayerData(UUIDProvider.retrieve(((Player)event.getEntity()).getName()));
+    			PlayerData attackerData = this.dataStore.getPlayerData(UUIDProvider.retrieve(attacker.getName()));
     			
     			//otherwise if protecting spawning players
     			if(GriefPrevention.instance.config_pvp_protectFreshSpawns)
@@ -685,7 +647,7 @@ public class EntityEventHandler implements Listener
                 PlayerData playerData = null;
                 if(attacker != null)
                 {
-                    playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+                    playerData = this.dataStore.getPlayerData(UUIDProvider.retrieve(attacker.getName()));
                     cachedClaim = playerData.lastClaim;
                 }
                 
@@ -730,19 +692,19 @@ public class EntityEventHandler implements Listener
 		                //limit attacks by players to owners and admins in ignore claims mode
 		                if(attacker != null)
 		                {
-    		                UUID ownerID = tameable.getOwner().getUniqueId();
+    		                UUID ownerID = UUIDProvider.retrieve(tameable.getOwner().getName());
     		               
     		                //if the player interacting is the owner, always allow
-    		                if(attacker.getUniqueId().equals(ownerID)) return;
+    		                if(UUIDProvider.retrieve(attacker.getName()).equals(ownerID)) return;
     		                
     		                //allow for admin override
-    		                PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+    		                PlayerData attackerData = this.dataStore.getPlayerData(UUIDProvider.retrieve(attacker.getName()));
     		                if(attackerData.ignoreClaims) return;
     		               
     		                //otherwise disallow in non-pvp worlds
     		                if(!GriefPrevention.instance.pvpRulesApply(subEvent.getEntity().getLocation().getWorld()))
                             {
-    		                    OfflinePlayer owner = GriefPrevention.instance.getServer().getOfflinePlayer(ownerID); 
+    		                    OfflinePlayer owner = GriefPrevention.instance.getServer().getOfflinePlayer(UUIDProvider.retrieve(ownerID));
                                 String ownerName = owner.getName();
         		                if(ownerName == null) ownerName = "someone";
         		                String message = GriefPrevention.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, ownerName);
@@ -774,7 +736,7 @@ public class EntityEventHandler implements Listener
 				
 				if(attacker != null)
 				{
-					playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+					playerData = this.dataStore.getPlayerData(UUIDProvider.retrieve(attacker.getName()));
 					cachedClaim = playerData.lastClaim;
 				}
 				
@@ -876,8 +838,8 @@ public class EntityEventHandler implements Listener
         //if attacker not a player, do nothing
         if(attacker == null) return;
         
-        PlayerData defenderData = this.dataStore.getPlayerData(defender.getUniqueId());
-        PlayerData attackerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+        PlayerData defenderData = this.dataStore.getPlayerData(UUIDProvider.retrieve(defender.getName()));
+        PlayerData attackerData = this.dataStore.getPlayerData(UUIDProvider.retrieve(attacker.getName()));
         
         if(attacker != defender)
         {
@@ -939,7 +901,7 @@ public class EntityEventHandler implements Listener
 		
 		if(attacker != null)
 		{
-			playerData = this.dataStore.getPlayerData(attacker.getUniqueId());
+			playerData = this.dataStore.getPlayerData(UUIDProvider.retrieve(attacker.getName()));
 			cachedClaim = playerData.lastClaim;
 		}
 		
@@ -981,94 +943,84 @@ public class EntityEventHandler implements Listener
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
     public void onPotionSplash (PotionSplashEvent event)
 	{
-	    ThrownPotion potion = event.getPotion();
-	    
-	    //ignore potions not thrown by players
-	    ProjectileSource projectileSource = potion.getShooter();
-        if(projectileSource == null || !(projectileSource instanceof Player)) return;
-        Player thrower = (Player)projectileSource;
-        
-	    Collection<PotionEffect> effects = potion.getEffects();
-	    for(PotionEffect effect : effects)
-	    {
-	        PotionEffectType effectType = effect.getType();
-	        //restrict some potions on claimed animals (griefers could use this to kill or steal animals over fences)
-	        if(effectType.getName().equals("JUMP") || effectType.getName().equals("POISON"))
-	        {
-	            for(LivingEntity effected : event.getAffectedEntities())
-	            {
-	                Claim cachedClaim = null; 
-	                if(effected instanceof Animals)
-	                {
-	                    Claim claim = this.dataStore.getClaimAt(effected.getLocation(), false, cachedClaim);
-	                      if(claim != null)
-	                      {
-	                          cachedClaim = claim;
-	                          if(claim.allowContainers(thrower) != null)
-	                          {
-	                              event.setCancelled(true);
-	                              GriefPrevention.sendMessage(thrower, TextMode.Err, Messages.NoDamageClaimedEntity, claim.getOwnerName());
-	                              return;
-	                          }
-	                      }
-	                }
-	            }
-	        }
-	        
-	        //otherwise, no restrictions for positive effects
-            if(positiveEffects.contains(effectType)) continue;
-	        
-	        for(LivingEntity effected : event.getAffectedEntities())
-	        {
-	            //always impact the thrower
-	            if(effected == thrower) continue;
-	            
-	            //always impact non players
-	            if(!(effected instanceof Player)) continue;
-	            
-	            //otherwise if in no-pvp zone, stop effect
-	            //FEATURE: prevent players from engaging in PvP combat inside land claims (when it's disabled)
-	            else if(GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims || GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims)
-	            {
-	                Player effectedPlayer = (Player)effected;
-	                PlayerData defenderData = this.dataStore.getPlayerData(effectedPlayer.getUniqueId());
-	                PlayerData attackerData = this.dataStore.getPlayerData(thrower.getUniqueId());
-	                Claim attackerClaim = this.dataStore.getClaimAt(thrower.getLocation(), false, attackerData.lastClaim);
-	                if( attackerClaim != null && 
-	                    (attackerClaim.isAdminClaim() && attackerClaim.parent == null && GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims ||
-	                     attackerClaim.isAdminClaim() && attackerClaim.parent != null && GriefPrevention.instance.config_pvp_noCombatInAdminSubdivisions ||
-	                    !attackerClaim.isAdminClaim() && GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims))
-	                {
-	                    attackerData.lastClaim = attackerClaim;
-	                    PreventPvPEvent pvpEvent = new PreventPvPEvent(attackerClaim);
-                        Bukkit.getPluginManager().callEvent(pvpEvent);
-                        if(!pvpEvent.isCancelled())
-                        {
-    	                    event.setIntensity(effected, 0);
-    	                    GriefPrevention.sendMessage(thrower, TextMode.Err, Messages.CantFightWhileImmune);
-    	                    continue;
-                        }
-	                }
-	                
-	                Claim defenderClaim = this.dataStore.getClaimAt(effectedPlayer.getLocation(), false, defenderData.lastClaim);
-	                if( defenderClaim != null &&
-	                    (defenderClaim.isAdminClaim() && defenderClaim.parent == null && GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims ||
-	                     defenderClaim.isAdminClaim() && defenderClaim.parent != null && GriefPrevention.instance.config_pvp_noCombatInAdminSubdivisions ||
-	                    !defenderClaim.isAdminClaim() && GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims))
-	                {
-	                    defenderData.lastClaim = defenderClaim;
-	                    PreventPvPEvent pvpEvent = new PreventPvPEvent(defenderClaim);
-                        Bukkit.getPluginManager().callEvent(pvpEvent);
-                        if(!pvpEvent.isCancelled())
-                        {
-    	                    event.setIntensity(effected, 0);
-    	                    GriefPrevention.sendMessage(thrower, TextMode.Err, Messages.PlayerInPvPSafeZone);
-    	                    continue;
-                        }
-	                }
-	            }
-	        }
-	    }
+		if (!GriefPrevention.legacy164) {
+			ThrownPotion potion = event.getPotion();
+
+			//ignore potions not thrown by players
+			ProjectileSource projectileSource = potion.getShooter();
+			if (projectileSource == null || !(projectileSource instanceof Player)) return;
+			Player thrower = (Player) projectileSource;
+
+			Collection<PotionEffect> effects = potion.getEffects();
+			for (PotionEffect effect : effects) {
+				PotionEffectType effectType = effect.getType();
+				//restrict some potions on claimed animals (griefers could use this to kill or steal animals over fences)
+				if (effectType.getName().equals("JUMP") || effectType.getName().equals("POISON")) {
+					for (LivingEntity effected : event.getAffectedEntities()) {
+						Claim cachedClaim = null;
+						if (effected instanceof Animals) {
+							Claim claim = this.dataStore.getClaimAt(effected.getLocation(), false, cachedClaim);
+							if (claim != null) {
+								cachedClaim = claim;
+								if (claim.allowContainers(thrower) != null) {
+									event.setCancelled(true);
+									GriefPrevention.sendMessage(thrower, TextMode.Err, Messages.NoDamageClaimedEntity, claim.getOwnerName());
+									return;
+								}
+							}
+						}
+					}
+				}
+
+				//otherwise, no restrictions for positive effects
+				if (positiveEffects.contains(effectType)) continue;
+
+				for (LivingEntity effected : event.getAffectedEntities()) {
+					//always impact the thrower
+					if (effected == thrower) continue;
+
+					//always impact non players
+					if (!(effected instanceof Player)) continue;
+
+						//otherwise if in no-pvp zone, stop effect
+						//FEATURE: prevent players from engaging in PvP combat inside land claims (when it's disabled)
+					else if (GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims || GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims) {
+						Player effectedPlayer = (Player) effected;
+						PlayerData defenderData = this.dataStore.getPlayerData(UUIDProvider.retrieve(effectedPlayer.getName()));
+						PlayerData attackerData = this.dataStore.getPlayerData(UUIDProvider.retrieve(thrower.getName()));
+						Claim attackerClaim = this.dataStore.getClaimAt(thrower.getLocation(), false, attackerData.lastClaim);
+						if (attackerClaim != null &&
+								(attackerClaim.isAdminClaim() && attackerClaim.parent == null && GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims ||
+										attackerClaim.isAdminClaim() && attackerClaim.parent != null && GriefPrevention.instance.config_pvp_noCombatInAdminSubdivisions ||
+										!attackerClaim.isAdminClaim() && GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims)) {
+							attackerData.lastClaim = attackerClaim;
+							PreventPvPEvent pvpEvent = new PreventPvPEvent(attackerClaim);
+							Bukkit.getPluginManager().callEvent(pvpEvent);
+							if (!pvpEvent.isCancelled()) {
+								event.setIntensity(effected, 0);
+								GriefPrevention.sendMessage(thrower, TextMode.Err, Messages.CantFightWhileImmune);
+								continue;
+							}
+						}
+
+						Claim defenderClaim = this.dataStore.getClaimAt(effectedPlayer.getLocation(), false, defenderData.lastClaim);
+						if (defenderClaim != null &&
+								(defenderClaim.isAdminClaim() && defenderClaim.parent == null && GriefPrevention.instance.config_pvp_noCombatInAdminLandClaims ||
+										defenderClaim.isAdminClaim() && defenderClaim.parent != null && GriefPrevention.instance.config_pvp_noCombatInAdminSubdivisions ||
+										!defenderClaim.isAdminClaim() && GriefPrevention.instance.config_pvp_noCombatInPlayerLandClaims)) {
+							defenderData.lastClaim = defenderClaim;
+							PreventPvPEvent pvpEvent = new PreventPvPEvent(defenderClaim);
+							Bukkit.getPluginManager().callEvent(pvpEvent);
+							if (!pvpEvent.isCancelled()) {
+								event.setIntensity(effected, 0);
+								GriefPrevention.sendMessage(thrower, TextMode.Err, Messages.PlayerInPvPSafeZone);
+								continue;
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 	
 	public static final HashSet<PotionEffectType> positiveEffects = new HashSet<PotionEffectType>(Arrays.asList

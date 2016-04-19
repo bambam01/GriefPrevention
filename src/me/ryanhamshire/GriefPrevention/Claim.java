@@ -18,6 +18,7 @@
 
 package me.ryanhamshire.GriefPrevention;
 
+import net.kaikk.mc.uuidprovider.UUIDProvider;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -294,7 +295,7 @@ public class Claim
 		}
 		
 		//no resizing, deleting, and so forth while under siege
-		if(player.getUniqueId().equals(this.ownerID))
+		if(UUIDProvider.retrieve(player.getName()).equals(this.ownerID))
 		{
 			if(this.siegeData != null)
 			{
@@ -348,14 +349,14 @@ public class Claim
 		}
 		
 		//no building while in pvp combat
-		PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+		PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(UUIDProvider.retrieve(player.getName()));
 		if(playerData.inPvpCombat())
 		{
 			return GriefPrevention.instance.dataStore.getMessage(Messages.NoBuildPvP);			
 		}
 		
 		//owners can make changes, or admins with ignore claims mode enabled
-		if(player.getUniqueId().equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId()).ignoreClaims) return null;
+		if(UUIDProvider.retrieve(player.getName()).equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(UUIDProvider.retrieve(player.getName())).ignoreClaims) return null;
 		
 		//anyone with explicit build permission can make changes
 		if(this.hasExplicitPermission(player, ClaimPermission.Build)) return null;
@@ -388,7 +389,7 @@ public class Claim
 	
 	private boolean hasExplicitPermission(Player player, ClaimPermission level)
 	{
-		String playerID = player.getUniqueId().toString();
+		String playerID = UUIDProvider.retrieve(player.getName()).toString();
 		Set<String> keys = this.playerIDToClaimPermissionMap.keySet();
 		Iterator<String> iterator = keys.iterator();
 		while(iterator.hasNext())
@@ -437,7 +438,7 @@ public class Claim
 			{
 				return GriefPrevention.instance.dataStore.getMessage(Messages.NonSiegeMaterial);
 			}
-			else if(player.getUniqueId().equals(this.ownerID))
+			else if(UUIDProvider.retrieve(player.getName()).equals(this.ownerID))
 			{
 				return GriefPrevention.instance.dataStore.getMessage(Messages.NoOwnerBuildUnderSiege);
 			}
@@ -464,7 +465,7 @@ public class Claim
 		}
 		
 		//claim owner and admins in ignoreclaims mode have access
-		if(player.getUniqueId().equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId()).ignoreClaims) return null;
+		if(UUIDProvider.retrieve(player.getName()).equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(UUIDProvider.retrieve(player.getName())).ignoreClaims) return null;
 		
 		//look for explicit individual access, inventory, or build permission
 		if(this.hasExplicitPermission(player, ClaimPermission.Access)) return null;
@@ -502,7 +503,7 @@ public class Claim
 		}
 		
 		//owner and administrators in ignoreclaims mode have access
-		if(player.getUniqueId().equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId()).ignoreClaims) return null;
+		if(UUIDProvider.retrieve(player.getName()).equals(this.ownerID) || GriefPrevention.instance.dataStore.getPlayerData(UUIDProvider.retrieve(player.getName())).ignoreClaims) return null;
 		
 		//admin claims need adminclaims permission only.
 		if(this.isAdminClaim())
@@ -542,7 +543,7 @@ public class Claim
 		for(int i = 0; i < this.managers.size(); i++)
 		{
 			String managerID = this.managers.get(i);
-			if(player.getUniqueId().toString().equals(managerID)) return null;
+			if(UUIDProvider.retrieve(player.getName()).toString().equals(managerID)) return null;
 			
 			else if(managerID.startsWith("(") && managerID.endsWith(")"))
 			{
