@@ -2934,7 +2934,10 @@ public class GriefPrevention extends JavaPlugin
                 }
             }
 
-            if(this.config_force_claim_blocks.contains(material) && playerData.getClaims().size() > 0){
+            if(this.config_force_claim_blocks.contains(material)){
+                if(playerData.getClaims().size() == 0 && material.equals(Material.CHEST)) {
+                    return null;
+                }
                 String reason = this.dataStore.getMessage(Messages.ForceClaim,material.name());
                 if(player.hasPermission("griefprevention.ignoreclaims"))
                     reason += "  " + this.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
